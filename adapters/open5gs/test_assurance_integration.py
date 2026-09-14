@@ -30,19 +30,35 @@ class FakeCollection:
         self.document = replacement
 
 
+def make_repository() -> InMemorySubscriberRepository:
+    return InMemorySubscriberRepository({
+        "7001": Subscriber(
+            subscriber_id="7001",
+            imsi="001010000000001",
+            ue_ip="10.20.0.11",
+            version=1,
+            status=SubscriberStatus.PROVISIONED,
+            secret_refs={"authentication": "env://TEST_7001"},
+            services={"ims": True, "data": True, "pstn_outbound": False},
+        )
+    })
+
+
+def make_request(version: int = 1, suffix: str = "") -> ExecutionRequest:
+    request_id = f"req-activate-7001-open5gs{suffix}"
+    return ExecutionRequest(
+        request_id=request_id,
+        idempotency_key=f"activate-7001-open5gs-v{version}{suffix}",
+        capability_id=f"cap-{request_id}",
+        operation="ACTIVATE",
+        target="7001",
+        expected_version=version,
+    )
+
+
 class Open5GSAssuranceIntegrationTest(unittest.TestCase):
     def test_activate_7001_reaches_verified_only_after_open5gs_readback(self) -> None:
-        repository = InMemorySubscriberRepository({
-            "7001": Subscriber(
-                subscriber_id="7001",
-                imsi="001010000000001",
-                ue_ip="10.20.0.11",
-                version=1,
-                status=SubscriberStatus.PROVISIONED,
-                secret_refs={"authentication": "env://TEST_7001"},
-                services={"ims": True, "data": True, "pstn_outbound": False},
-            )
-        })
+        repository = make_repository()
         collection = FakeCollection()
         adapter = Open5GSAdapter(repository, collection, FakeSecrets())
         broker = CapabilityBroker({
@@ -54,69 +70,35 @@ class Open5GSAssuranceIntegrationTest(unittest.TestCase):
             )
         })
         core = AssuranceCore(repository, broker, adapter.execute, adapter.readback, activate_postcondition)
-        request = ExecutionRequest(
-            request_id="req-activate-7001-open5gs",
-            idempotency_key="activate-7001-open5gs-v1",
-            capability_id="cap-req-activate-7001-open5gs",
-            operation="ACTIVATE",
-            target="7001",
-            expected_version=1,
-        )
 
-        result = core.execute(principal="assurance-service", request=request)
+        result = core.execute(principal="assurance-service", request=make_request())
         self.assertEqual(result.status, AssuranceStatus.VERIFIED)
         self.assertEqual(result.observed_version, 2)
         self.assertEqual(repository.get("7001").status, SubscriberStatus.ACTIVE)
 
-    def test_modified_projection_is_drift_not_verified(self) -> None:
-        repository = InMemorySubscriberRepository({
-            "7001": Subscriber(
-                subscriber_id="7001",
-                imsi="001010000000001",
-                ue_ip="10.20.0.11",
-                version=1,
-                status=SubscriberStatus.PROVISIONED,
-                secret_refs={"authentication": "env://TEST_7001"},
-                services={"ims": True, "data": True},
-            )
-        })
+    def test_modified_projection_is_reported_as_drift_by_readback(self) -> None:
+        repository = make_repository()
         collection = FakeCollection()
         adapter = Open5GSAdapter(repository, collection, FakeSecrets())
+        adapter.execute(make_request())
+        assert collection.document is not None
+        collection.document["ue"] = {"ipv4": "10.20.0.99"}
+
+        readback = adapter.readback("7001")
+        self.assertEqual(readback.observed_version, 2)
+        self.assertEqual(readback.state, "MISMATCH")
+
         broker = CapabilityBroker({
             "ACTIVATE": Policy(
                 version="policy-1",
                 allowed_operations=frozenset({"ACTIVATE"}),
                 allowed_principals=frozenset({"assurance-service"}),
+                max_risk="MEDIUM",
             )
         })
-        core = AssuranceCore(repository, broker, adapter.execute, adapter.readback, activate_postcondition)
-        request = ExecutionRequest(
-            request_id="req-activate-7001-drift",
-            idempotency_key="activate-7001-drift-v1",
-            capability_id="cap-req-activate-7001-drift",
-            operation="ACTIVATE",
-            target="7001",
-            expected_version=1,
-        )
-        adapter.execute(request)
-        assert collection.document is not None
-        collection.document["ue"] = {"ipv4": "10.20.0.99"}
-
-        result = core.execute(principal="assurance-service", request=request)
-        # The idempotency cache prevents a second execution of the same request.
-        self.assertEqual(result.status, AssuranceStatus.VERIFIED)
-
-        fresh_request = ExecutionRequest(
-            request_id="req-activate-7001-drift-2",
-            idempotency_key="activate-7001-drift-v2",
-            capability_id="cap-req-activate-7001-drift-2",
-            operation="ACTIVATE",
-            target="7001",
-            expected_version=2,
-        )
-        # A new request is denied because ACTIVATE is only valid from PROVISIONED in the current policy path.
-        denied = core.execute(principal="assurance-service", request=fresh_request)
-        self.assertIn(denied.status, {AssuranceStatus.FAILED, AssuranceStatus.DENIED})
+        core = AssuranceCore(repository, broker, lambda _: True, adapter.readback, activate_postcondition)
+        result = core.execute(principal="assurance-service", request=make_request(1, "-drift"))
+        self.assertEqual(result.status, AssuranceStatus.DRIFT)
 
 
 if __name__ == "__main__":
