@@ -44,15 +44,19 @@ class CapabilityBroker:
             raise CapabilityDeniedError("target does not match canonical subscriber")
         if request.expected_version != subscriber.version:
             raise CapabilityDeniedError("expected_version does not match canonical state")
+        if request.capability_id != f"cap-{request.request_id}":
+            raise CapabilityDeniedError("capability_id does not bind to request_id")
         if request.operation == "ROUTE_CALL" and not subscriber.services.get("pstn_outbound", False):
             raise CapabilityDeniedError("PSTN outbound capability is not enabled")
 
         risk = "MEDIUM" if request.operation in {"ACTIVATE", "SUSPEND", "ROUTE_CALL"} else "LOW"
+        if risk not in self._risk_rank or policy.max_risk not in self._risk_rank:
+            raise CapabilityDeniedError("unknown risk classification")
         if self._risk_rank[risk] > self._risk_rank[policy.max_risk]:
             raise CapabilityDeniedError("requested operation exceeds policy risk ceiling")
 
         return Capability(
-            capability_id=f"cap-{request.request_id}",
+            capability_id=request.capability_id,
             principal=principal,
             operation=request.operation,
             resource=request.target,

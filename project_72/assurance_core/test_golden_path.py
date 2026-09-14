@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from project_72.assurance_core.assurance import AssuranceCore
 from project_72.assurance_core.broker import CapabilityBroker, Policy
 from project_72.assurance_core.models import (
     AssuranceStatus,
@@ -10,7 +11,6 @@ from project_72.assurance_core.models import (
     Subscriber,
     SubscriberStatus,
 )
-from project_72.assurance_core.assurance import AssuranceCore
 from project_72.assurance_core.store import InMemorySubscriberRepository
 
 
@@ -72,7 +72,7 @@ class Activate7001Test(unittest.TestCase):
         request = ExecutionRequest(
             request_id="req-activate-7001-0001",
             idempotency_key="activate-7001-v1",
-            capability_id="cap-activate-7001",
+            capability_id="cap-req-activate-7001-0001",
             operation="ACTIVATE",
             target="7001",
             expected_version=1,
