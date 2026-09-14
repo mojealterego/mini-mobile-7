@@ -16,6 +16,7 @@ from adapters.open5gs.secrets import EnvironmentSecretResolver
 from project_72.assurance_core.assurance import AssuranceCore
 from project_72.assurance_core.broker import CapabilityBroker, Policy
 from project_72.assurance_core.catalog import build_seven_subscriber_catalog
+from project_72.assurance_core.idempotency import MongoIdempotencyStore
 from project_72.assurance_core.lifecycle_postconditions import lifecycle_postcondition
 from project_72.assurance_core.models import AssuranceStatus, ExecutionRequest, SubscriberStatus
 from project_72.assurance_core.store import MongoSubscriberRepository, SubscriberNotFoundError
@@ -44,12 +45,14 @@ def make_core(mongodb_uri: str) -> tuple[MongoSubscriberRepository, Open5GSAdapt
             max_risk="MEDIUM",
         )
     })
+    idempotency = MongoIdempotencyStore(mongodb_uri)
     core = AssuranceCore(
         canonical,
         broker,
         adapter.execute,
         adapter.readback,
         lambda readback: lifecycle_postcondition("ACTIVE")(readback),
+        idempotency_store=idempotency,
     )
     return canonical, adapter, core
 
