@@ -3,8 +3,8 @@ set -euo pipefail
 
 # Render deployment-local UERANSIM UE configs from the canonical seven-subscriber
 # mapping. Authentication material is read from external environment variables
-# and is never written to Git. Secrets are passed to the renderer over stdin,
-# not as process arguments.
+# and is never written to Git. Secrets are passed through file descriptor 3,
+# not as process arguments or generated shell files.
 
 OUT_DIR="${1:-runtime/ueransim}"
 GNB_ADDRESS="${MM7_GNB_ADDRESS:-10.10.0.6}"
@@ -26,14 +26,15 @@ for slot in 1 2 3 4 5 6 7; do
         exit 1
     fi
 
-    if ! printf '%s' "$secret_json" | python3 - "$imsi" "$MCC" "$MNC" "$GNB_ADDRESS" > "$output" <<'PY'
+    if python3 - "$imsi" "$MCC" "$MNC" "$GNB_ADDRESS" 3<<<"$secret_json" > "$output" <<'PY'
 import ipaddress
 import json
 import re
 import sys
 
 imsi, mcc, mnc, gnb = sys.argv[1:]
-raw = sys.stdin.read()
+with open(3, encoding="utf-8") as secret_stream:
+    raw = secret_stream.read()
 value = json.loads(raw)
 if not isinstance(value, dict):
     raise SystemExit("authentication reference must resolve to an object")
@@ -86,6 +87,8 @@ print("  EA2: true")
 print("  EA3: true")
 PY
     then
+        :
+    else
         rm -f "$output"
         echo "ERROR failed to render ${subscriber_id}" >&2
         exit 1
