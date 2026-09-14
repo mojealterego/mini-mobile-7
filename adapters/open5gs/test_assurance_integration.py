@@ -76,17 +76,18 @@ class Open5GSAssuranceIntegrationTest(unittest.TestCase):
         self.assertEqual(result.observed_version, 2)
         self.assertEqual(repository.get("7001").status, SubscriberStatus.ACTIVE)
 
-    def test_modified_projection_is_reported_as_drift_by_readback(self) -> None:
+    def test_modified_projection_is_drift_not_verified(self) -> None:
         repository = make_repository()
         collection = FakeCollection()
         adapter = Open5GSAdapter(repository, collection, FakeSecrets())
         adapter.execute(make_request())
         assert collection.document is not None
-        collection.document["ue"] = {"ipv4": "10.20.0.99"}
-
-        readback = adapter.readback("7001")
-        self.assertEqual(readback.observed_version, 2)
-        self.assertEqual(readback.state, "MISMATCH")
+        slices = collection.document["slice"]
+        assert isinstance(slices, list)
+        sessions = slices[0]["session"]
+        assert isinstance(sessions, list)
+        internet = next(item for item in sessions if item["name"] == "internet")
+        internet["ue"]["ipv4"] = "10.20.0.99"
 
         broker = CapabilityBroker({
             "ACTIVATE": Policy(
@@ -99,6 +100,7 @@ class Open5GSAssuranceIntegrationTest(unittest.TestCase):
         core = AssuranceCore(repository, broker, lambda _: True, adapter.readback, activate_postcondition)
         result = core.execute(principal="assurance-service", request=make_request(1, "-drift"))
         self.assertEqual(result.status, AssuranceStatus.DRIFT)
+        self.assertEqual(result.observed_version, 2)
 
 
 if __name__ == "__main__":
