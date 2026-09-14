@@ -59,11 +59,27 @@ class MongoSubscriberRepository(SubscriberRepository):
         self._collection.create_index("subscriber_id", unique=True)
         self._collection.create_index("imsi", unique=True)
 
+    @classmethod
+    def from_uri(cls, mongodb_uri: str, *, database_name: str = "mini_mobile_7") -> "MongoSubscriberRepository":
+        return cls(mongodb_uri, database=database_name)
+
     def get(self, subscriber_id: str) -> Subscriber:
         document = self._collection.find_one({"subscriber_id": subscriber_id})
         if document is None:
             raise SubscriberNotFoundError(subscriber_id)
         return _from_document(document)
+
+    def insert(self, subscriber: Subscriber) -> Subscriber:
+        """Insert an initial canonical record; refuse duplicate subscriber or IMSI."""
+        from pymongo.errors import DuplicateKeyError
+
+        try:
+            self._collection.insert_one(subscriber.to_document())
+        except DuplicateKeyError as exc:
+            raise StoreConflictError(
+                f"canonical subscriber already exists: {subscriber.subscriber_id}"
+            ) from exc
+        return subscriber
 
     def put(self, subscriber: Subscriber, *, expected_version: int) -> Subscriber:
         from pymongo import ReturnDocument
