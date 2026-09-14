@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from typing import Mapping, Protocol
 
@@ -16,11 +17,11 @@ class SecretResolver(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class EnvironmentSecretResolver:
-    """Resolve a secret reference from one environment variable.
+    """Resolve an external env:// reference from a shell-safe variable name.
 
-    The variable contains a JSON object, for example:
-    {"k":"...","opc":"...","amf":"8000"}.
-    The JSON is supplied by the deployment secret manager, never by Git.
+    Example reference ``env://MINI_MOBILE_7/7001`` maps to
+    ``MM7_SECRET_MINI_MOBILE_7_7001``. The variable contains a JSON object
+    supplied by the deployment secret manager, never by Git.
     """
 
     prefix: str = "MM7_SECRET_"
@@ -32,7 +33,9 @@ class EnvironmentSecretResolver:
             raise SecretResolutionError(
                 "unsupported secret_ref; expected an external env:// reference"
             )
-        variable = f"{self.prefix}{secret_ref.removeprefix('env://')}"
+        logical_ref = secret_ref.removeprefix("env://")
+        variable_suffix = re.sub(r"[^A-Za-z0-9_]", "_", logical_ref)
+        variable = f"{self.prefix}{variable_suffix}"
         raw = os.environ.get(variable)
         if not raw:
             raise SecretResolutionError(f"secret reference is not available: {secret_ref}")
