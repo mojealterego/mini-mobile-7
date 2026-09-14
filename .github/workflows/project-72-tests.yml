@@ -24,3 +24,20 @@ jobs:
           python-version: "3.11"
       - name: Run Project-72 assurance tests
         run: make assurance-test
+      - name: Validate UERANSIM renderer
+        env:
+          MM7_SECRET_MINI_MOBILE_7_7001: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
+          MM7_SECRET_MINI_MOBILE_7_7002: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
+          MM7_SECRET_MINI_MOBILE_7_7003: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
+          MM7_SECRET_MINI_MOBILE_7_7004: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
+          MM7_SECRET_MINI_MOBILE_7_7005: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
+          MM7_SECRET_MINI_MOBILE_7_7006: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
+          MM7_SECRET_MINI_MOBILE_7_7007: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
+        run: |
+          bash -n scripts/project-72-render-ueransim.sh
+          scripts/project-72-render-ueransim.sh /tmp/mm7-ueransim
+          test "$(find /tmp/mm7-ueransim -maxdepth 1 -type f -name 'ue-*.yaml' | wc -l)" -eq 7
+          grep -q "supi: 'imsi-001010000000001'" /tmp/mm7-ueransim/ue-7001.yaml
+          grep -q "supi: 'imsi-001010000000007'" /tmp/mm7-ueransim/ue-7007.yaml
+          grep -q "apn: internet" /tmp/mm7-ueransim/ue-7001.yaml
+          grep -q "gnbSearchList:" /tmp/mm7-ueransim/ue-7001.yaml
