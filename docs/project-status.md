@@ -9,13 +9,13 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | Capability Broker | IMPLEMENTED IN CODE | Fail-closed authorization, target/version/capability/risk checks |
 | Assurance Core | IMPLEMENTED IN CODE | Authorization -> execution -> authoritative readback -> postcondition -> VERIFIED |
 | Optimistic concurrency | IMPLEMENTED IN CODE | `expected_version` enforced atomically by canonical repository implementations |
-| Idempotency | IMPLEMENTED IN CODE | Process-local replay protection is active; durable MongoDB result storage is now available as an integration building block |
+| Idempotency | IMPLEMENTED IN CODE | Optional durable MongoDB reservation + terminal-result persistence; process-local cache remains the default unless a durable store is injected |
 | Drift detection | IMPLEMENTED IN CODE | Projection mismatch is classified as DRIFT; no automatic repair |
 | Open5GS v2.8.0 bootstrap | IMPLEMENTED | Exact source tag is built; floating `ppa:open5gs/latest` removed |
 | Subscriber lifecycle | IMPLEMENTED IN CODE | PROVISIONED -> ACTIVE -> SUSPENDED -> RETIRED with optimistic concurrency |
 | Lifecycle postconditions | IMPLEMENTED IN CODE | ACTIVATE/SUSPEND/DEACTIVATE each require authoritative readback and state-specific postcondition |
 | Seven-subscriber lifecycle tests | TESTED IN CI | Catalog, full 7001 lifecycle and wrong-version denial covered by deterministic tests |
-| CI validation | GREEN | Workflow #85 passed for commit `1f5f3fd69502d43fd78b823245d29c8faac2b968` |
+| CI validation | GREEN | Workflow #85 passed for commit `1f5f3fd69502d43fd78b823245d29c8faac2b968` before the current idempotency changes |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
 | UERANSIM gNB template | AUDITED | PLMN/TAC/SST/AMF/gNB addressing aligned with lab contract |
 | Seven-UE renderer | IMPLEMENTED | Deployment-local UE configs for 7001-7007; external authentication references |
@@ -43,12 +43,15 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 - The other writer must receive `StoreConflictError` and is classified as `CONFLICT` at the assurance layer.
 - The in-memory repository now protects the compare-and-write operation with a lock; the MongoDB implementation already uses an atomic `find_one_and_update` predicate on `subscriber_id + version`.
 
-## Idempotency durability boundary
+## Gate 3C — durable idempotency reservation
 
-- The assurance layer currently prevents replay within one process using an in-memory idempotency cache.
-- Added `MongoIdempotencyStore` for durable storage of request fingerprints and completed assurance results.
-- The durable store is intentionally not described as a complete cross-process execution lock yet: reservation/lease semantics must be added before it becomes the authoritative multi-process execution gate.
-- This preserves the fail-closed requirement rather than falsely treating post-execution persistence as protection against concurrent duplicate execution.
+- Added `InMemoryIdempotencyStore` as a deterministic reference implementation.
+- Added `MongoIdempotencyStore` backed by a unique `key` index.
+- A request reserves its idempotency key before execution; another process with the same key cannot start a second execution.
+- Same key + different fingerprint is `CONFLICT`.
+- Same key + completed result is replayed without execution.
+- A reservation without a terminal result fails closed as `CONFLICT`; there is deliberately no automatic lease takeover because taking over after an unknown crash could duplicate a non-idempotent telecom side effect.
+- Durable idempotency is opt-in through `AssuranceCore.idempotency_store`; live runtime wiring is still required before this becomes the production execution gate.
 
 ## IMS boundary correction
 
