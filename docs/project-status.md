@@ -1,6 +1,6 @@
 # Project Status
 
-Phase 2A/2B/2C implementation is being developed on `project-72/phase-2a` and is not yet merged to `main`.
+Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and is not yet merged to `main`.
 
 | Stage | Status | Completion condition |
 |---|---|---|
@@ -22,11 +22,12 @@ Phase 2A/2B/2C implementation is being developed on `project-72/phase-2a` and is
 | Subscriber lifecycle | IMPLEMENTED IN CODE | PROVISIONED -> ACTIVE -> SUSPENDED -> RETIRED with optimistic concurrency |
 | Lifecycle postconditions | IMPLEMENTED IN CODE | ACTIVATE/SUSPEND/DEACTIVATE each require authoritative readback and state-specific postcondition |
 | Seven-subscriber lifecycle tests | TESTED IN CI | Catalog, full 7001 lifecycle and wrong-version denial covered by deterministic tests |
-| CI validation | GREEN | Current branch head passed Project-72 test workflow |
+| CI validation | PENDING CURRENT HEAD | Earlier head passed; renderer/preflight changes require current workflow completion |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
-| Ubuntu bootstrap | READY | Run on the actual Linux host |
-| Open5GS Core | READY | Requires actual Linux host and installation |
-| One subscriber projection | TESTED IN CI | Canonical Store -> Open5GS adapter -> authoritative readback path covered by deterministic tests |
+| UERANSIM gNB template | AUDITED | PLMN/TAC/SST/AMF/gNB addressing aligned with lab contract |
+| Seven-UE renderer | IMPLEMENTED | Deployment-local UE configs for 7001-7007; secrets never passed as process arguments |
+| Seven-UE renderer CI validation | IMPLEMENTED | Shell syntax and seven-config deterministic rendering tested with dummy credentials |
+| UERANSIM attach | PENDING HOST | Requires actual UERANSIM/Open5GS runtime |
 | Seven live subscriber projections | NEXT | Requires actual MongoDB/Open5GS runtime and external secrets |
 | UE Internet | READY | Requires actual host routing/NAT configuration |
 | IMS/Kamailio | SCAFFOLD | Requires stable Core/data plane |
@@ -82,13 +83,19 @@ Phase 2A/2B/2C implementation is being developed on `project-72/phase-2a` and is
 - Preflight never prints authentication secret values.
 - Runtime provisioning remains an explicit controlled-host action; the default `make provision-seven` path is dry-run.
 
-### CI correction
+### Phase 2D — UERANSIM boundary
 
-The first GitHub Actions execution exposed a real package error: `project_72/__init__.py` imported modules from the wrong package level. That defect was corrected. The current branch head `2a3b480cb91e70f2bbe0827d196f8b4a4a25c5f5` subsequently passed the Project-72 test workflow.
+- Audited the existing gNB and UE templates.
+- Confirmed the gNB lab contract uses PLMN `001/01`, TAC `1`, SST `1`, AMF `10.10.0.5` and gNB `10.10.0.6`.
+- Added deployment-local rendering for all seven UE identities.
+- Added strict validation for IMSI, MCC/MNC, gNB address and external authentication material shape.
+- Changed secret transport so authentication material is not supplied to Python as process arguments.
+- Added CI coverage using non-production dummy authentication values only.
+- Generated UE files are runtime-local and excluded from Git.
 
 ## Validation note
 
-CI validates deterministic source-level behavior only. No live Open5GS deployment, UE attach, RAN session, IMS call or public telephony interconnect has been claimed.
+CI validates deterministic source-level behavior only. The current post-renderer HEAD has a workflow pending. No live Open5GS deployment, UE attach, RAN session, IMS call or public telephony interconnect has been claimed.
 
 ## Important limitation
 
