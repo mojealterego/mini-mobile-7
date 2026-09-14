@@ -32,84 +32,131 @@ class AssuranceCore:
             try:
                 subscriber = self.repository.get(request.target)
             except KeyError:
-                result = AssuranceResult(
-                    request.request_id, request.target, AssuranceStatus.FAILED,
-                    False, False, False, False, False, "canonical subscriber not found"
+                return self._cache(
+                    request,
+                    AssuranceResult(
+                        request.request_id, request.target, AssuranceStatus.FAILED,
+                        False, False, False, False, False, "canonical subscriber not found"
+                    ),
                 )
-                self._results[request.idempotency_key] = result
-                return result
 
             try:
                 capability = self.broker.authorize(
                     principal=principal, request=request, subscriber=subscriber
                 )
             except CapabilityDeniedError as exc:
-                result = AssuranceResult(
-                    request.request_id, request.target, AssuranceStatus.DENIED,
-                    False, False, False, False, False, str(exc)
+                return self._cache(
+                    request,
+                    AssuranceResult(
+                        request.request_id, request.target, AssuranceStatus.DENIED,
+                        False, False, False, False, False, str(exc)
+                    ),
                 )
-                self._results[request.idempotency_key] = result
-                return result
 
             if capability.decision != "ALLOW":
-                result = AssuranceResult(
-                    request.request_id, request.target, AssuranceStatus.DENIED,
-                    True, False, False, False, False, "capability decision is not ALLOW"
+                return self._cache(
+                    request,
+                    AssuranceResult(
+                        request.request_id, request.target, AssuranceStatus.DENIED,
+                        True, False, False, False, False, "capability decision is not ALLOW"
+                    ),
                 )
-                self._results[request.idempotency_key] = result
-                return result
 
             try:
                 executed = self.executor(request)
             except StoreConflictError as exc:
-                result = AssuranceResult(
-                    request.request_id, request.target, AssuranceStatus.CONFLICT,
-                    True, True, False, False, False, str(exc), subscriber.version
+                return self._cache(
+                    request,
+                    AssuranceResult(
+                        request.request_id, request.target, AssuranceStatus.CONFLICT,
+                        True, True, False, False, False, str(exc), subscriber.version
+                    ),
                 )
-                self._results[request.idempotency_key] = result
-                return result
             except Exception as exc:
-                result = AssuranceResult(
-                    request.request_id, request.target, AssuranceStatus.FAILED,
-                    True, True, False, False, False, f"execution error: {exc}"
+                return self._cache(
+                    request,
+                    AssuranceResult(
+                        request.request_id, request.target, AssuranceStatus.FAILED,
+                        True, True, False, False, False, f"execution error: {exc}"
+                    ),
                 )
-                self._results[request.idempotency_key] = result
-                return result
 
             if not executed:
-                result = AssuranceResult(
-                    request.request_id, request.target, AssuranceStatus.UNVERIFIED,
-                    True, True, False, False, False,
-                    "executor did not confirm completion"
+                return self._cache(
+                    request,
+                    AssuranceResult(
+                        request.request_id, request.target, AssuranceStatus.UNVERIFIED,
+                        True, True, False, False, False,
+                        "executor did not confirm completion"
+                    ),
                 )
-                self._results[request.idempotency_key] = result
-                return result
 
-            readback = self.readback_provider(request.target)
+            try:
+                readback = self.readback_provider(request.target)
+            except Exception as exc:
+                return self._cache(
+                    request,
+                    AssuranceResult(
+                        request.request_id, request.target, AssuranceStatus.UNVERIFIED,
+                        True, True, True, False, False,
+                        f"authoritative readback failed: {exc}"
+                    ),
+                )
+
             if readback.observed_version <= request.expected_version:
-                result = AssuranceResult(
-                    request.request_id, request.target, AssuranceStatus.STALE,
-                    True, True, True, False, False,
-                    "authoritative readback did not advance beyond expected_version",
-                    readback.observed_version,
+                return self._cache(
+                    request,
+                    AssuranceResult(
+                        request.request_id, request.target, AssuranceStatus.STALE,
+                        True, True, True, False, False,
+                        "authoritative readback did not advance beyond expected_version",
+                        readback.observed_version,
+                    ),
                 )
-                self._results[request.idempotency_key] = result
-                return result
 
-            postcondition_ok, reason = self.postcondition(readback)
+            if readback.state == "MISMATCH":
+                return self._cache(
+                    request,
+                    AssuranceResult(
+                        request.request_id, request.target, AssuranceStatus.DRIFT,
+                        True, True, True, True, False,
+                        "authoritative Open5GS state differs from canonical postcondition",
+                        readback.observed_version,
+                    ),
+                )
+
+            try:
+                postcondition_ok, reason = self.postcondition(readback)
+            except Exception as exc:
+                return self._cache(
+                    request,
+                    AssuranceResult(
+                        request.request_id, request.target, AssuranceStatus.UNVERIFIED,
+                        True, True, True, True, False,
+                        f"postcondition evaluation failed: {exc}",
+                        readback.observed_version,
+                    ),
+                )
+
             if not postcondition_ok:
-                result = AssuranceResult(
-                    request.request_id, request.target, AssuranceStatus.UNVERIFIED,
-                    True, True, True, True, False, reason,
-                    readback.observed_version
+                return self._cache(
+                    request,
+                    AssuranceResult(
+                        request.request_id, request.target, AssuranceStatus.UNVERIFIED,
+                        True, True, True, True, False, reason,
+                        readback.observed_version
+                    ),
                 )
-                self._results[request.idempotency_key] = result
-                return result
 
-            result = AssuranceResult(
-                request.request_id, request.target, AssuranceStatus.VERIFIED,
-                True, True, True, True, True, "all assurance gates passed",
-                readback.observed_version,
+            return self._cache(
+                request,
+                AssuranceResult(
+                    request.request_id, request.target, AssuranceStatus.VERIFIED,
+                    True, True, True, True, True, "all assurance gates passed",
+                    readback.observed_version,
+                ),
             )
-            self._results[request.idempotency_key] = result
-            return result
+
+    def _cache(self, request: ExecutionRequest, result: AssuranceResult) -> AssuranceResult:
+        self._results[request.idempotency_key] = result
+        return result
