@@ -22,6 +22,7 @@ Phase 2A/2B/2C implementation is being developed on `project-72/phase-2a` and is
 | Subscriber lifecycle | IMPLEMENTED IN CODE | PROVISIONED -> ACTIVE -> SUSPENDED -> RETIRED with optimistic concurrency |
 | Lifecycle postconditions | IMPLEMENTED IN CODE | ACTIVATE/SUSPEND/DEACTIVATE each require authoritative readback and state-specific postcondition |
 | Seven-subscriber lifecycle tests | TESTED IN CODE | Catalog, full 7001 lifecycle and wrong-version denial covered by deterministic tests |
+| CI validation | FIX IN PROGRESS | First CI run exposed an incorrect package export; export was corrected and requires a fresh CI run |
 | Ubuntu bootstrap | READY | Run on the actual Linux host |
 | Open5GS Core | READY | Requires actual Linux host and installation |
 | One subscriber projection | TESTED IN CODE | Canonical Store -> Open5GS adapter -> authoritative readback path covered by deterministic tests |
@@ -71,9 +72,13 @@ Phase 2A/2B/2C implementation is being developed on `project-72/phase-2a` and is
 - Added deterministic seven-subscriber lifecycle tests.
 - Kept PSTN outbound disabled in the canonical catalog by default.
 
+### CI correction
+
+The first GitHub Actions execution reached the test command and exposed a real package error: `project_72/__init__.py` imported modules from the wrong package level. That file has now been corrected to export from `project_72.assurance_core`. The failing run is retained as evidence of the defect discovery; the corrected branch still requires a fresh CI execution before being marked green.
+
 ## Validation note
 
-The test suite is committed but has not been executed against a live repository checkout from this chat environment. A local/CI execution of `make assurance-test` is still required before the branch is considered validated.
+A live Open5GS deployment has not been claimed. CI validation is being used for deterministic source-level tests; runtime validation still requires the actual Ubuntu/Open5GS/MongoDB host and external authentication secrets.
 
 ## Important limitation
 
