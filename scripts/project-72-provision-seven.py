@@ -35,11 +35,12 @@ def build_request(subscriber_id: str, version: int, operation: str) -> Execution
     )
 
 
-def run_preflight() -> bool:
+def run_preflight(mongodb_uri: str) -> bool:
     if not PREFLIGHT_SCRIPT.is_file():
         print(f"BLOCK: runtime preflight script missing: {PREFLIGHT_SCRIPT}", file=sys.stderr)
         return False
     env = os.environ.copy()
+    env["MM7_MONGODB_URI"] = mongodb_uri
     env["MM7_SKIP_SECRET_PREFLIGHT"] = "0"
     result = subprocess.run(
         ["bash", str(PREFLIGHT_SCRIPT)],
@@ -86,7 +87,7 @@ def _catalog_match(current, expected) -> bool:
 
 
 def provision_execute(mongodb_uri: str, idempotency_uri: str, bootstrap_canonical: bool) -> int:
-    if not run_preflight():
+    if not run_preflight(mongodb_uri):
         return 2
 
     canonical, adapter, core = make_core(mongodb_uri, idempotency_uri)
