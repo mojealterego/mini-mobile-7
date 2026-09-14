@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
+import json
 from dataclasses import dataclass
 from typing import Any, Mapping, Protocol
 
@@ -34,7 +35,7 @@ class Open5GSAdapterError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class Open5GSAdapter:
-    """Project canonical state into Open5GS and provide authoritative readback."""
+    """Project canonical state into the Open5GS subscribers collection."""
 
     canonical: SubscriberRepository
     collection: Open5GSCollection
@@ -64,7 +65,7 @@ class Open5GSAdapter:
             )
             self.canonical.put(target, expected_version=request.expected_version)
         elif current.version == request.expected_version + 1 and current.status is SubscriberStatus.ACTIVE:
-            # Recovery path after a canonical commit succeeded but projection did not.
+            # Recovery after a canonical commit succeeded but projection failed.
             target = current
         else:
             raise Open5GSAdapterError(
@@ -115,6 +116,7 @@ class Open5GSAdapter:
             details={
                 "imsi": document.get("imsi"),
                 "marker": dict(marker),
+                "services": _projected_services(document),
             },
         )
 
@@ -124,10 +126,37 @@ class Open5GSAdapter:
         except ValueError as exc:
             raise Open5GSAdapterError(f"invalid UE IP: {subscriber.ue_ip}") from exc
 
+        if not {"k", "opc", "amf"}.issubset(auth):
+            raise Open5GSAdapterError("secret resolver must provide k, opc and amf")
+
+        sessions: list[dict[str, Any]] = [
+            _session(
+                name="internet",
+                qos_index=9,
+                ue_ipv4=subscriber.ue_ip,
+            )
+        ]
+        if subscriber.services.get("ims", False):
+            sessions.append(_session(name="ims", qos_index=5, ue_ipv4=None))
+
         return {
+            "schema_version": 1,
             "imsi": subscriber.imsi,
+            "msisdn": [subscriber.msisdn] if subscriber.msisdn else [],
+            "imeisv": [],
+            "mme_host": [],
+            "mm_realm": [],
+            "purge_flag": [],
+            "slice": [
+                {
+                    "sst": 1,
+                    "default_indicator": True,
+                    "session": sessions,
+                }
+            ],
             "security": {
                 "k": auth["k"],
+                "op": None,
                 "opc": auth["opc"],
                 "amf": auth["amf"],
             },
@@ -135,30 +164,41 @@ class Open5GSAdapter:
                 "downlink": {"value": 1, "unit": 3},
                 "uplink": {"value": 1, "unit": 3},
             },
-            "slice": [
-                {
-                    "sst": 1,
-                    "default_indicator": True,
-                    "session": [
-                        {
-                            "name": "internet",
-                            "type": 3,
-                            "qos": {"index": 9, "arp": {"priority": 8}},
-                            "ambr": {
-                                "downlink": {"value": 1, "unit": 3},
-                                "uplink": {"value": 1, "unit": 3},
-                            },
-                        }
-                    ],
-                }
-            ],
-            "ue": {"ipv4": subscriber.ue_ip},
+            "access_restriction_data": 32,
+            "network_access_mode": 0,
+            "subscriber_status": 1,
+            "operator_determined_barring": 0,
+            "subscribed_rau_tau_timer": 12,
+            "__v": 0,
             "mm7_assurance": {
                 "subscriber_id": subscriber.subscriber_id,
                 "canonical_version": subscriber.version,
                 "status": "ACTIVE",
             },
         }
+
+
+def _session(*, name: str, qos_index: int, ue_ipv4: str | None) -> dict[str, Any]:
+    session: dict[str, Any] = {
+        "name": name,
+        "type": 3,
+        "qos": {
+            "index": qos_index,
+            "arp": {
+                "priority_level": 8 if name == "internet" else 1,
+                "pre_emption_capability": 1,
+                "pre_emption_vulnerability": 2,
+            },
+        },
+        "ambr": {
+            "downlink": {"value": 1, "unit": 3},
+            "uplink": {"value": 1, "unit": 3},
+        },
+        "pcc_rule": [],
+    }
+    if ue_ipv4 is not None:
+        session["ue"] = {"ipv4": ue_ipv4}
+    return session
 
 
 def _assurance_marker(document: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
@@ -170,19 +210,35 @@ def _assurance_marker(document: Mapping[str, Any] | None) -> Mapping[str, Any] |
 
 def _projection_matches(subscriber: Subscriber, document: Mapping[str, Any]) -> bool:
     marker = _assurance_marker(document) or {}
-    ue = document.get("ue")
-    return (
-        document.get("imsi") == subscriber.imsi
-        and marker.get("subscriber_id") == subscriber.subscriber_id
-        and int(marker.get("canonical_version", 0)) == subscriber.version
-        and marker.get("status") == "ACTIVE"
-        and isinstance(ue, Mapping)
-        and ue.get("ipv4") == subscriber.ue_ip
-    )
+    if (
+        document.get("imsi") != subscriber.imsi
+        or marker.get("subscriber_id") != subscriber.subscriber_id
+        or int(marker.get("canonical_version", 0)) != subscriber.version
+        or marker.get("status") != "ACTIVE"
+    ):
+        return False
+
+    slices = document.get("slice")
+    if not isinstance(slices, list) or not slices:
+        return False
+    sessions = slices[0].get("session") if isinstance(slices[0], Mapping) else None
+    if not isinstance(sessions, list):
+        return False
+
+    internet = next((s for s in sessions if isinstance(s, Mapping) and s.get("name") == "internet"), None)
+    if not isinstance(internet, Mapping):
+        return False
+    ue = internet.get("ue")
+    return isinstance(ue, Mapping) and ue.get("ipv4") == subscriber.ue_ip
+
+
+def _projected_services(document: Mapping[str, Any]) -> dict[str, bool]:
+    slices = document.get("slice")
+    sessions = slices[0].get("session") if isinstance(slices, list) and slices and isinstance(slices[0], Mapping) else []
+    names = {s.get("name") for s in sessions if isinstance(s, Mapping)}
+    return {"data": "internet" in names, "ims": "ims" in names}
 
 
 def _fingerprint(document: Mapping[str, Any]) -> str:
-    import json
-
     canonical = json.dumps(document, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
