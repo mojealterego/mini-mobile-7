@@ -1,5 +1,7 @@
 # Project Status
 
+Phase 2A/2B implementation is being developed on `project-72/phase-2a` and is not yet merged to `main`.
+
 | Stage | Status | Completion condition |
 |---|---|---|
 | Repository | DONE | Repository initialized and protected against accidental secret commits |
@@ -10,14 +12,14 @@
 | Canonical Subscriber Store | IMPLEMENTED | Versioned canonical model plus MongoDB adapter and in-memory deterministic test adapter |
 | Capability Broker | IMPLEMENTED | Fail-closed policy/scope/risk gate |
 | Assurance Core | IMPLEMENTED | Authorization + policy + execution + authoritative readback + postcondition gate |
-| Golden Path ACTIVATE 7001 | TESTED | Deterministic in-memory path reaches VERIFIED and retry is idempotent |
+| Golden Path ACTIVATE 7001 | TESTED IN CODE | Deterministic in-memory path reaches VERIFIED and retry is idempotent |
 | Open5GS version drift | FIXED IN BRANCH | Bootstrap builds exact v2.8.0 source tag instead of floating PPA package |
 | Open5GS projection adapter | IMPLEMENTED | Canonical ACTIVE state is projected with external secret resolution and optimistic concurrency |
 | Open5GS authoritative readback | IMPLEMENTED | Open5GS projection is read back and classified as ACTIVE/ABSENT/MISMATCH |
 | Drift classification | IMPLEMENTED | Authoritative MISMATCH is classified as DRIFT and cannot be VERIFIED |
 | Ubuntu bootstrap | READY | Run on the actual Linux host |
 | Open5GS Core | READY | Requires actual Linux host and installation |
-| One subscriber projection | TESTED | Canonical Store -> Open5GS adapter -> authoritative readback path covered by deterministic tests |
+| One subscriber projection | TESTED IN CODE | Canonical Store -> Open5GS adapter -> authoritative readback path covered by deterministic tests |
 | UE Internet | READY | Requires actual host routing/NAT configuration |
 | IMS/Kamailio | SCAFFOLD | Requires stable Core/data plane |
 | Asterisk/PSTN gateway | ARCHITECTURE CAPTURED | Requires lawful operator SIP trunk, numbering and SBC policy |
@@ -52,6 +54,10 @@
 - Added authoritative Open5GS readback with deterministic fingerprinting.
 - Added explicit `MISMATCH -> DRIFT` classification in Assurance Core.
 - Added deterministic adapter and assurance integration tests.
+
+## Validation note
+
+The test suite is committed but has not been executed against a live repository checkout from this chat environment. A local/CI execution of `make assurance-test` is still required before the branch is considered validated.
 
 ## Important limitation
 
