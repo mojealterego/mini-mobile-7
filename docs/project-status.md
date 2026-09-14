@@ -14,6 +14,7 @@ Phase 2A/2B implementation is being developed on `project-72/phase-2a` and is no
 | Assurance Core | IMPLEMENTED | Authorization + policy + execution + authoritative readback + postcondition gate |
 | Golden Path ACTIVATE 7001 | TESTED IN CODE | Deterministic in-memory path reaches VERIFIED and retry is idempotent |
 | Open5GS version drift | FIXED IN BRANCH | Bootstrap builds exact v2.8.0 source tag instead of floating PPA package |
+| Open5GS v2.8.0 subscriber schema | VERIFIED AGAINST PINNED TOOLING | Adapter follows the v2.8.0 `open5gs-dbctl` subscriber document layout |
 | Open5GS projection adapter | IMPLEMENTED | Canonical ACTIVE state is projected with external secret resolution and optimistic concurrency |
 | Open5GS authoritative readback | IMPLEMENTED | Open5GS projection is read back and classified as ACTIVE/ABSENT/MISMATCH |
 | Drift classification | IMPLEMENTED | Authoritative MISMATCH is classified as DRIFT and cannot be VERIFIED |
@@ -48,12 +49,14 @@ Phase 2A/2B implementation is being developed on `project-72/phase-2a` and is no
 
 - Replaced the floating `ppa:open5gs/latest` installation path with a source build pinned to the official `v2.8.0` tag.
 - Kept MongoDB on the 8.0 package line.
+- Verified the pinned Open5GS v2.8.0 `open5gs-dbctl` layout: static IPv4 belongs under `slice[0].session[0].ue.ipv4`, and the subscriber document uses the `security`, `slice`, `ambr` and subscriber-status structures implemented by the adapter. citeturn2view0
 - Added the Open5GS projection adapter under `adapters/open5gs/`.
+- Added a runtime `from_mongodb()` constructor; the MongoDB URI remains deployment-provided.
 - Activation advances canonical state using optimistic concurrency and then projects the resulting ACTIVE version to Open5GS.
 - Authentication material is resolved only through an external `secret_ref` resolver; no supplied credentials are copied into Git.
 - Added authoritative Open5GS readback with deterministic fingerprinting.
 - Added explicit `MISMATCH -> DRIFT` classification in Assurance Core.
-- Added deterministic adapter and assurance integration tests.
+- Added deterministic adapter, drift and assurance integration tests.
 
 ## Validation note
 
