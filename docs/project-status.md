@@ -2,7 +2,7 @@
 
 | Stage | Status | Completion condition |
 |---|---|---|
-| Repository | DONE | Private repository initialized |
+| Repository | DONE | Repository initialized and protected against accidental secret commits |
 | Security baseline | DONE | Secret-handling and firewall rules documented |
 | Architecture | DONE | Core/RAN/IMS topology documented |
 | Addressing | DONE | Management/Core/UE/IMS ranges documented |
@@ -10,13 +10,14 @@
 | Canonical Subscriber Store | IMPLEMENTED | Versioned canonical model plus MongoDB adapter and in-memory deterministic test adapter |
 | Capability Broker | IMPLEMENTED | Fail-closed policy/scope/risk gate |
 | Assurance Core | IMPLEMENTED | Authorization + policy + execution + authoritative readback + postcondition gate |
-| Golden Path ACTIVATE 7001 | TESTED | Deterministic in-memory test reaches VERIFIED and retry is idempotent |
+| Golden Path ACTIVATE 7001 | TESTED | Deterministic in-memory path reaches VERIFIED and retry is idempotent |
 | Open5GS version drift | FIXED IN BRANCH | Bootstrap builds exact v2.8.0 source tag instead of floating PPA package |
+| Open5GS projection adapter | IMPLEMENTED | Canonical ACTIVE state is projected with external secret resolution and optimistic concurrency |
+| Open5GS authoritative readback | IMPLEMENTED | Open5GS projection is read back and classified as ACTIVE/ABSENT/MISMATCH |
+| Drift classification | IMPLEMENTED | Authoritative MISMATCH is classified as DRIFT and cannot be VERIFIED |
 | Ubuntu bootstrap | READY | Run on the actual Linux host |
 | Open5GS Core | READY | Requires actual Linux host and installation |
-| Open5GS authoritative adapter | NEXT | Requires adapter against a real Open5GS instance |
-| UERANSIM lab | READY | Requires actual Linux host and simulator installation |
-| One subscriber projection | NEXT | Canonical Store -> Open5GS adapter with authoritative readback |
+| One subscriber projection | TESTED | Canonical Store -> Open5GS adapter -> authoritative readback path covered by deterministic tests |
 | UE Internet | READY | Requires actual host routing/NAT configuration |
 | IMS/Kamailio | SCAFFOLD | Requires stable Core/data plane |
 | Asterisk/PSTN gateway | ARCHITECTURE CAPTURED | Requires lawful operator SIP trunk, numbering and SBC policy |
@@ -41,11 +42,16 @@
 - Added Assurance Core and deterministic `ACTIVATE 7001` Golden Path test.
 - Added `make assurance-test`.
 
-### Phase 2B — deterministic Core bootstrap
+### Phase 2B — deterministic Core bootstrap and Open5GS boundary
 
 - Replaced the floating `ppa:open5gs/latest` installation path with a source build pinned to the official `v2.8.0` tag.
 - Kept MongoDB on the 8.0 package line.
-- The repository now treats Open5GS version drift as an explicit deployment failure rather than an acceptable upgrade.
+- Added the Open5GS projection adapter under `adapters/open5gs/`.
+- Activation advances canonical state using optimistic concurrency and then projects the resulting ACTIVE version to Open5GS.
+- Authentication material is resolved only through an external `secret_ref` resolver; no supplied credentials are copied into Git.
+- Added authoritative Open5GS readback with deterministic fingerprinting.
+- Added explicit `MISMATCH -> DRIFT` classification in Assurance Core.
+- Added deterministic adapter and assurance integration tests.
 
 ## Important limitation
 
