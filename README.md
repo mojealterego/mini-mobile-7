@@ -302,11 +302,35 @@ Validation: source-level runtime wiring tests now cover the execution database, 
 
 **Gate 4D status: CODE HARDENED. LIVE DATABASE/OPEN5GS ACCEPTANCE: PENDING.**
 
+## Gate 4D — seven-subscriber projection test expansion
+
+Expanded the Open5GS assurance integration test from the single `7001` Golden Path to the complete deterministic catalog `7001–7007`.
+
+The new test uses a seven-document fake Open5GS collection and executes the full assurance chain separately for each subscriber. It verifies:
+
+- every catalog subscriber reaches `VERIFIED`;
+- authoritative readback observes canonical version `2` after activation;
+- every canonical subscriber becomes `ACTIVE`;
+- exactly seven Open5GS projection documents are produced;
+- each projection preserves its IMSI and subscriber assurance marker;
+- the projected Internet session contains the catalog UE IPv4 address;
+- the test remains secret-safe by using synthetic authentication material only.
+
+Affected file:
+- `adapters/open5gs/test_assurance_integration.py`
+
+Implementation commit:
+- `68dae781eed859b3d623701d9670ec52bd7c8db6` — verify Open5GS projection/readback for all seven subscribers
+
+This is still a deterministic adapter/integration test, not a claim of a live Open5GS host. Live acceptance remains the next physical/runtime gate.
+
+**Gate 4D status: CODE PATH COVERED FOR 7001–7007. LIVE OPEN5GS READBACK: PENDING.**
+
 ## CI validation
 
 The Project-72 workflow validates the assurance suite and UERANSIM renderer. Run #120 completed successfully for the bootstrap-hardening revision: `assurance-tests` passed and the UERANSIM renderer validation passed.
 
-The subsequent URI-binding, durable-store and readback commits triggered newer CI runs. Their final results must be checked before marking this latest revision CI-green.
+The subsequent runtime hardening and seven-subscriber projection-test commits have triggered newer CI runs. The latest run must finish before the current revision is marked CI-green.
 
 ## Implementation commit trail
 
@@ -335,6 +359,7 @@ The subsequent URI-binding, durable-store and readback commits triggered newer C
 | `8dbe824b6442c8d185c74d16afdfa808ee6156fd` | Runtime wiring regression coverage |
 | `d0418a35673f872661c4af0b8b9e759f236a0f3b` | Durable idempotency connectivity preflight |
 | `0bc1fc119ac025e8420639a2ba2a2d8ce32f3cdc` | Preflight/idempotency/readback regression coverage |
+| `68dae781eed859b3d623701d9670ec52bd7c8db6` | Seven-subscriber Open5GS assurance coverage |
 
 ## Current status — 2026-09-15
 
@@ -358,6 +383,7 @@ The subsequent URI-binding, durable-store and readback commits triggered newer C
 - runtime/preflight MongoDB URI binding
 - durable idempotency database connectivity preflight
 - active-subscriber authoritative readback target correction
+- seven-subscriber Open5GS projection/readback deterministic coverage
 - IMS/Kamailio/Asterisk security boundary templates
 - CI assurance and renderer validation
 
@@ -391,7 +417,7 @@ Gate 4B  Canonical 7001-7007 bootstrap        [CODE IMPLEMENTED / HOST PENDING]
    |
 Gate 4C  UERANSIM deployment configuration    [CODE IMPLEMENTED / HOST PENDING]
    |
-Gate 4D  Open5GS projection + readback        [CODE HARDENED / HOST PENDING]
+Gate 4D  Open5GS projection + readback        [CODE COVERED / HOST PENDING]
    |
 Gate 4E  UERANSIM attach                      [HOST]
    |
