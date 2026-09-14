@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from typing import Any
 
 from adapters.open5gs.adapter import Open5GSAdapter
 from adapters.open5gs.secrets import EnvironmentSecretResolver
@@ -35,11 +34,7 @@ def build_request(subscriber_id: str, version: int, operation: str) -> Execution
 
 def make_core(mongodb_uri: str) -> tuple[MongoSubscriberRepository, Open5GSAdapter, AssuranceCore]:
     canonical = MongoSubscriberRepository.from_uri(mongodb_uri)
-    adapter = Open5GSAdapter.from_mongodb(
-        canonical,
-        mongodb_uri,
-        EnvironmentSecretResolver(),
-    )
+    adapter = Open5GSAdapter.from_mongodb(canonical, mongodb_uri, EnvironmentSecretResolver())
     policies = {
         operation: Policy(
             version="runtime-policy-1",
@@ -55,7 +50,7 @@ def make_core(mongodb_uri: str) -> tuple[MongoSubscriberRepository, Open5GSAdapt
         broker,
         adapter.execute,
         adapter.readback,
-        lifecycle_postcondition,
+        lambda readback: lifecycle_postcondition("ACTIVE")(readback),
     )
     return canonical, adapter, core
 
