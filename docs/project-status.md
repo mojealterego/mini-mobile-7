@@ -15,8 +15,9 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | Subscriber lifecycle | IMPLEMENTED IN CODE | PROVISIONED -> ACTIVE -> SUSPENDED -> RETIRED with optimistic concurrency |
 | Lifecycle postconditions | IMPLEMENTED IN CODE | ACTIVATE/SUSPEND/DEACTIVATE each require authoritative readback and state-specific postcondition |
 | Seven-subscriber lifecycle tests | TESTED IN CI | Catalog, full 7001 lifecycle and wrong-version denial covered by deterministic tests |
-| CI validation | GREEN | Workflow #85 passed for commit `1f5f3fd69502d43fd78b823245d29c8faac2b968` before the current idempotency changes |
+| CI validation | PENDING FRESH RUN | Previous workflow #99 passed before the latest runtime-wiring test/Makefile changes; a fresh run is required |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
+| Runtime provisioner | IMPLEMENTED IN CODE | `--execute` requires durable MongoDB idempotency URI and injects `MongoIdempotencyStore` into AssuranceCore |
 | UERANSIM gNB template | AUDITED | PLMN/TAC/SST/AMF/gNB addressing aligned with lab contract |
 | Seven-UE renderer | IMPLEMENTED | Deployment-local UE configs for 7001-7007; external authentication references |
 | Seven-UE renderer CI validation | IMPLEMENTED | Shell syntax and seven-config deterministic rendering tested with dummy credentials |
@@ -51,7 +52,7 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 - Same key + different fingerprint is `CONFLICT`.
 - Same key + completed result is replayed without execution.
 - A reservation without a terminal result fails closed as `CONFLICT`; there is deliberately no automatic lease takeover because taking over after an unknown crash could duplicate a non-idempotent telecom side effect.
-- Durable idempotency is opt-in through `AssuranceCore.idempotency_store`; live runtime wiring is still required before this becomes the production execution gate.
+- Runtime `--execute` now requires the durable MongoDB idempotency URI and injects the durable store into AssuranceCore.
 
 ## IMS boundary correction
 
