@@ -5,7 +5,7 @@ help:
 	@echo "  make validate          - validate the Linux host prerequisites"
 	@echo "  make bootstrap-ubuntu22 - install pinned lab host prerequisites"
 	@echo "  make build-ueransim   - build pinned UERANSIM"
-	@echo "  make assurance-test   - run Project-72 assurance and adapter tests"
+	@echo "  make assurance-test   - run Project-72 assurance, adapter and lifecycle tests"
 
 validate:
 	bash scripts/validate-host.sh
@@ -20,5 +20,6 @@ assurance-test:
 	PYTHONPATH=. python3 -m unittest \
 		project_72.assurance_core.test_golden_path \
 		project_72.assurance_core.test_drift \
+		project_72.assurance_core.test_lifecycle \
 		adapters.open5gs.test_adapter \
 		adapters.open5gs.test_assurance_integration -v
