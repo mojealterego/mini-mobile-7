@@ -1,6 +1,6 @@
-from .assurance import AssuranceCore
-from .broker import CapabilityBroker, CapabilityDeniedError, Policy
-from .models import (
+from .assurance_core.assurance import AssuranceCore
+from .assurance_core.broker import CapabilityBroker, CapabilityDeniedError, Policy
+from .assurance_core.models import (
     AssuranceResult,
     AssuranceStatus,
     AuthoritativeReadback,
@@ -9,7 +9,7 @@ from .models import (
     Subscriber,
     SubscriberStatus,
 )
-from .store import (
+from .assurance_core.store import (
     InMemorySubscriberRepository,
     MongoSubscriberRepository,
     StoreConflictError,
