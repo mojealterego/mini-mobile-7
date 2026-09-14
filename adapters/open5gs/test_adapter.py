@@ -63,7 +63,7 @@ class Open5GSAdapterTest(unittest.TestCase):
         document = self.collection.document
         self.assertEqual(document["schema_version"], 1)
         self.assertEqual(document["imsi"], "001010000000001")
-        self.assertEqual(document["subscriber_status"], 1)
+        self.assertEqual(document["subscriber_status"], 0)
         slices = document["slice"]
         assert isinstance(slices, list)
         sessions = slices[0]["session"]
@@ -75,6 +75,25 @@ class Open5GSAdapterTest(unittest.TestCase):
         marker = document["mm7_assurance"]
         assert isinstance(marker, dict)
         self.assertEqual(marker["canonical_version"], 2)
+        self.assertEqual(marker["status"], "ACTIVE")
+
+    def test_suspend_projects_open5gs_subscriber_status_one(self) -> None:
+        self.adapter.execute(self.request)
+        suspend = ExecutionRequest(
+            request_id="req-suspend-7001-0003",
+            idempotency_key="suspend-7001-v2-adapter",
+            capability_id="cap-req-suspend-7001-0003",
+            operation="SUSPEND",
+            target="7001",
+            expected_version=2,
+        )
+        self.assertTrue(self.adapter.execute(suspend))
+        self.assertEqual(self.repository.get("7001").status, SubscriberStatus.SUSPENDED)
+        assert self.collection.document is not None
+        self.assertEqual(self.collection.document["subscriber_status"], 1)
+        result = self.adapter.readback("7001")
+        self.assertEqual(result.state, "SUSPENDED")
+        self.assertEqual(result.observed_version, 3)
 
     def test_readback_confirms_projected_state_and_services(self) -> None:
         self.adapter.execute(self.request)
