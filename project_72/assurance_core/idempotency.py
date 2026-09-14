@@ -12,10 +12,21 @@ class IdempotencyConflictError(ValueError):
     """Raised when an idempotency key is reused for a different request."""
 
 
+class IdempotencyInProgressError(RuntimeError):
+    """Raised when another execution owns an idempotency key."""
+
+
 @dataclass(frozen=True, slots=True)
 class IdempotencyFingerprint:
     key: str
     fingerprint: str
+
+
+@dataclass(frozen=True, slots=True)
+class IdempotencyRecord:
+    key: str
+    fingerprint: str
+    result: AssuranceResult | None
 
 
 def fingerprint_request(request: ExecutionRequest) -> str:
@@ -35,11 +46,46 @@ def fingerprint_request(request: ExecutionRequest) -> str:
 class IdempotencyStore(Protocol):
     """Durable interface for cross-process idempotency state."""
 
-    def get(self, key: str) -> tuple[str, AssuranceResult] | None:
-        """Return the stored fingerprint/result or None when the key is absent."""
+    def reserve(self, key: str, fingerprint: str) -> IdempotencyRecord | None:
+        """Atomically reserve a new key or return the existing record."""
 
     def put(self, key: str, fingerprint: str, result: AssuranceResult) -> None:
-        """Atomically persist a new idempotency record."""
+        """Persist the terminal result for an existing reservation."""
+
+
+class InMemoryIdempotencyStore:
+    """Thread-safe reference implementation for deterministic tests."""
+
+    def __init__(self) -> None:
+        from threading import RLock
+
+        self._records: dict[str, IdempotencyRecord] = {}
+        self._lock = RLock()
+
+    def reserve(self, key: str, fingerprint: str) -> IdempotencyRecord | None:
+        with self._lock:
+            existing = self._records.get(key)
+            if existing is not None:
+                if existing.fingerprint != fingerprint:
+                    raise IdempotencyConflictError(
+                        f"idempotency key was already used for a different request: {key}"
+                    )
+                return existing
+            self._records[key] = IdempotencyRecord(key, fingerprint, None)
+            return None
+
+    def put(self, key: str, fingerprint: str, result: AssuranceResult) -> None:
+        with self._lock:
+            existing = self._records.get(key)
+            if existing is None:
+                raise IdempotencyInProgressError(
+                    f"cannot finalize an unreserved idempotency key: {key}"
+                )
+            if existing.fingerprint != fingerprint:
+                raise IdempotencyConflictError(
+                    f"idempotency key was already used for a different request: {key}"
+                )
+            self._records[key] = IdempotencyRecord(key, fingerprint, result)
 
 
 class MongoIdempotencyStore:
@@ -52,28 +98,56 @@ class MongoIdempotencyStore:
         self._collection = self._client[database]["assurance_idempotency"]
         self._collection.create_index("key", unique=True)
 
-    def get(self, key: str) -> tuple[str, AssuranceResult] | None:
-        document = self._collection.find_one({"key": key})
-        if document is None:
-            return None
-        return str(document["fingerprint"]), _result_from_document(document["result"])
-
-    def put(self, key: str, fingerprint: str, result: AssuranceResult) -> None:
+    def reserve(self, key: str, fingerprint: str) -> IdempotencyRecord | None:
         from pymongo.errors import DuplicateKeyError
 
-        document = {
-            "key": key,
-            "fingerprint": fingerprint,
-            "result": _result_to_document(result),
-        }
         try:
-            self._collection.insert_one(document)
+            self._collection.insert_one({"key": key, "fingerprint": fingerprint, "result": None})
+            return None
         except DuplicateKeyError as exc:
-            existing = self.get(key)
-            if existing is None or existing[0] != fingerprint:
+            existing = self._collection.find_one({"key": key})
+            if existing is None:
+                raise IdempotencyInProgressError(
+                    f"idempotency reservation disappeared during conflict handling: {key}"
+                ) from exc
+            existing_fingerprint = str(existing["fingerprint"])
+            if existing_fingerprint != fingerprint:
                 raise IdempotencyConflictError(
                     f"idempotency key was already used for a different request: {key}"
                 ) from exc
+            result_document = existing.get("result")
+            return IdempotencyRecord(
+                key=key,
+                fingerprint=existing_fingerprint,
+                result=(
+                    _result_from_document(result_document)
+                    if result_document is not None
+                    else None
+                ),
+            )
+
+    def put(self, key: str, fingerprint: str, result: AssuranceResult) -> None:
+        from pymongo import ReturnDocument
+
+        document = self._collection.find_one_and_update(
+            {"key": key, "fingerprint": fingerprint, "result": None},
+            {"$set": {"result": _result_to_document(result)}},
+            return_document=ReturnDocument.AFTER,
+        )
+        if document is None:
+            existing = self._collection.find_one({"key": key})
+            if existing is None:
+                raise IdempotencyInProgressError(
+                    f"cannot finalize an unreserved idempotency key: {key}"
+                )
+            if str(existing["fingerprint"]) != fingerprint:
+                raise IdempotencyConflictError(
+                    f"idempotency key was already used for a different request: {key}"
+                )
+            if existing.get("result") is None:
+                raise IdempotencyInProgressError(
+                    f"idempotency key is reserved by another execution: {key}"
+                )
 
 
 def _result_to_document(result: AssuranceResult) -> dict[str, Any]:
