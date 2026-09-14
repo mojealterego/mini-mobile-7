@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from typing import Any, Mapping
 
-from .models import Subscriber
+from .models import Subscriber, SubscriberStatus
 
 
 class StoreConflictError(RuntimeError):
@@ -87,12 +86,16 @@ class MongoSubscriberRepository(SubscriberRepository):
 
 
 def _from_document(document: Mapping[str, Any]) -> Subscriber:
+    try:
+        status = SubscriberStatus(str(document["status"]))
+    except (KeyError, ValueError) as exc:
+        raise ValueError("canonical subscriber contains an invalid status") from exc
     return Subscriber(
         subscriber_id=str(document["subscriber_id"]),
         imsi=str(document["imsi"]),
         ue_ip=str(document["ue_ip"]),
         version=int(document["version"]),
-        status=document["status"],
+        status=status,
         secret_refs=dict(document["secret_refs"]),
         services=dict(document["services"]),
         msisdn=document.get("msisdn"),
