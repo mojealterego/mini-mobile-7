@@ -80,15 +80,10 @@ class Open5GSAssuranceIntegrationTest(unittest.TestCase):
         self.assertEqual(repository.get("7001").status, SubscriberStatus.ACTIVE)
 
     def test_modified_projection_is_drift_not_verified(self) -> None:
-        repository = make_repository()
+        projection_repository = make_repository()
         collection = FakeCollection()
-        adapter = Open5GSAdapter(repository, collection, FakeSecrets())
-
-        # Create the Open5GS projection without changing the canonical version.
-        # The following readback observes version 2 while the test request still
-        # carries the original expected_version=1. This isolates projection drift
-        # from the broker's optimistic-concurrency guard.
-        adapter.execute(make_request())
+        projection_adapter = Open5GSAdapter(projection_repository, collection, FakeSecrets())
+        projection_adapter.execute(make_request())
         assert collection.document is not None
 
         slices = collection.document["slice"]
@@ -99,11 +94,21 @@ class Open5GSAssuranceIntegrationTest(unittest.TestCase):
         assert isinstance(internet["ue"], dict)
         internet["ue"]["ipv4"] = "10.20.0.99"
 
-        # Restore the canonical store to version 1 so authorization succeeds;
-        # the deliberately modified Open5GS projection remains version 2.
-        repository = make_repository()
-        core = AssuranceCore(repository, make_broker(), lambda _: True, adapter.readback, activate_postcondition)
-        result = core.execute(principal="assurance-service", request=make_request(1, "-drift"))
+        # Keep canonical state at v1 while retaining the already-written v2
+        # Open5GS projection. This isolates projection drift from concurrency denial.
+        canonical_repository = make_repository()
+        readback_adapter = Open5GSAdapter(canonical_repository, collection, FakeSecrets())
+        core = AssuranceCore(
+            canonical_repository,
+            make_broker(),
+            lambda _: True,
+            readback_adapter.readback,
+            activate_postcondition,
+        )
+        result = core.execute(
+            principal="assurance-service",
+            request=make_request(1, "-drift"),
+        )
 
         self.assertEqual(result.status, AssuranceStatus.DRIFT)
         self.assertEqual(result.observed_version, 2)
