@@ -276,9 +276,41 @@ There is no automatic reconciliation of conflicting canonical identity data. A m
 
 **Gate 4B code status: IMPLEMENTED. Host/database acceptance: PENDING.**
 
+## 2026-09-15 — Gate 4D preflight URI binding
+
+Identified and fixed a runtime safety gap: the provisioner accepted `--mongodb-uri` for the actual execution path, while the preflight script could independently read `MM7_MONGODB_URI` from the inherited environment. That allowed preflight to validate one MongoDB endpoint while execution could mutate another.
+
+The runtime path now passes the exact execution `mongodb_uri` into `run_preflight()`, and the subprocess environment is explicitly set to that URI before the preflight starts. This makes the safety gate and the mutation target identical by construction.
+
+Added a runtime-wiring regression test requiring:
+
+```text
+run_preflight(mongodb_uri)
+        |
+        +--> MM7_MONGODB_URI = mongodb_uri
+        |
+        +--> preflight
+        |
+        +--> only then make_core(mongodb_uri, ...)
+```
+
+Affected files:
+- `scripts/project-72-provision-seven.py`
+- `project_72/assurance_core/test_runtime_wiring.py`
+
+Implementation commits:
+- `99007e5c1db55b72cd4d243e28c6bfd43b947ab5` — bind runtime preflight to execution MongoDB URI
+- `67e5d6c2a2e2faeda49644a3aac1e1155eb79a78` — add regression coverage
+
+Validation: static runtime-wiring coverage updated. CI must validate the new commits before they are marked green.
+
+**Gate 4D status: HARDENED CODE. LIVE OPEN5GS PROJECTION/READBACK: NEXT.**
+
 ## CI validation
 
-The Project-72 workflow validates the assurance suite and UERANSIM renderer. Completed run #110 passed its principal assurance and renderer steps. Runtime-preflight and canonical-bootstrap changes triggered subsequent runs, including run #120 for the bootstrap-hardening revision. The latest revision must have its CI result checked before being marked CI-green.
+The Project-72 workflow validates the assurance suite and UERANSIM renderer. Completed run #110 passed its principal assurance and renderer steps. Run #120 also completed successfully for the bootstrap-hardening revision: `assurance-tests` passed and the UERANSIM renderer validation passed.
+
+The URI-binding commits above have triggered a newer CI run; its final result must be checked before marking this latest change CI-green.
 
 ## Implementation commit trail
 
@@ -301,6 +333,8 @@ The Project-72 workflow validates the assurance suite and UERANSIM renderer. Com
 | `054f16eff78722bb812b2e0d04cda1e67d9d8a8d` | Runtime preflight wiring tests |
 | `7fdcda0d49fd457b86df750103c2c31850f1ddfe` | Canonical atomic bootstrap implementation |
 | `adfff92ed7e4f5abb74a15faf30438d7f779046b` | Canonical bootstrap/idempotency tests |
+| `99007e5c1db55b72cd4d243e28c6bfd43b947ab5` | Bind preflight to execution MongoDB URI |
+| `67e5d6c2a2e2faeda49644a3aac1e1155eb79a78` | URI-binding regression test |
 
 ## Current status — 2026-09-15
 
@@ -321,6 +355,7 @@ The Project-72 workflow validates the assurance suite and UERANSIM renderer. Com
 - UERANSIM configuration renderer
 - mandatory runtime preflight
 - canonical bootstrap conflict protection
+- runtime/preflight MongoDB URI binding
 - IMS/Kamailio/Asterisk security boundary templates
 - CI assurance and renderer validation
 
@@ -366,8 +401,6 @@ Gate 7   Security/isolation                   [HOST]
 FINAL    VERIFIED                             [ALL APPLICABLE GATES]
 ```
 
-## Engineering rule for future work
+## Engineering rule
 
-Every substantive implementation step must update this `README.md` in the same work stream with what changed, why it changed, affected files/components, validation performed, CI result when available, remaining limitations and next gate.
-
-This log is not a claim of live deployment. It is the persistent record of repository engineering progress and acceptance state.
+Every substantive implementation step must update this `README.md` with: **what changed, why, affected files/components, validation, CI result when available, limitations and next gate**. The log records engineering progress and acceptance state; it is not a claim of live deployment.
