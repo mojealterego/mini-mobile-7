@@ -25,6 +25,7 @@ assurance-test:
 		project_72.assurance_core.test_drift \
 		project_72.assurance_core.test_lifecycle \
 		project_72.assurance_core.test_idempotency \
+		project_72.assurance_core.test_idempotency_concurrency \
 		project_72.assurance_core.test_concurrency \
 		project_72.assurance_core.test_runtime_wiring \
 		adapters.open5gs.test_adapter \
