@@ -4,99 +4,48 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 
 | Stage | Status | Completion condition |
 |---|---|---|
-| Repository | DONE | Repository initialized and protected against accidental secret commits |
-| Security baseline | DONE | Secret-handling and firewall rules documented |
-| Architecture | DONE | Core/RAN/IMS topology documented |
-| Addressing | DONE | Management/Core/UE/IMS ranges documented |
-| Project-72 contracts | IMPLEMENTED | JSON Schema contracts for subscriber, capability, execution, readback, postcondition and assurance result |
-| Canonical Subscriber Store | IMPLEMENTED | Versioned canonical model plus MongoDB adapter and in-memory deterministic test adapter |
-| Capability Broker | IMPLEMENTED | Fail-closed policy/scope/risk gate |
-| Assurance Core | IMPLEMENTED | Authorization + policy + execution + authoritative readback + postcondition gate |
-| Golden Path ACTIVATE 7001 | TESTED IN CI | Deterministic path reaches VERIFIED and retry is idempotent |
-| Open5GS version drift | FIXED IN BRANCH | Bootstrap builds exact v2.8.0 source tag instead of floating PPA package |
-| Open5GS v2.8.0 subscriber schema | VERIFIED AGAINST PINNED TOOLING | Adapter follows the v2.8.0 `open5gs-dbctl` subscriber document layout |
-| Open5GS projection adapter | IMPLEMENTED | Canonical lifecycle state is projected with external secret resolution and optimistic concurrency |
-| Open5GS authoritative readback | IMPLEMENTED | Projection is read back and classified by canonical lifecycle state |
-| Drift classification | IMPLEMENTED | Authoritative MISMATCH is classified as DRIFT and cannot be VERIFIED |
-| Seven-subscriber catalog | IMPLEMENTED IN CODE | Deterministic 7001-7007 / 10.20.0.11-10.20.0.17 catalog with external secret refs |
+| Project-72 contracts | IMPLEMENTED IN CODE | Subscriber, capability, execution, readback, postcondition and assurance-result schemas |
+| Canonical Subscriber Store | IMPLEMENTED IN CODE | MongoDB + deterministic seven-subscriber catalog |
+| Capability Broker | IMPLEMENTED IN CODE | Fail-closed authorization, target/version/capability/risk checks |
+| Assurance Core | IMPLEMENTED IN CODE | Authorization -> execution -> authoritative readback -> postcondition -> VERIFIED |
+| Optimistic concurrency | IMPLEMENTED IN CODE | `expected_version` enforced by canonical repository |
+| Idempotency | IMPLEMENTED IN CODE | Stable idempotency key returns the prior assurance result |
+| Drift detection | IMPLEMENTED IN CODE | Projection mismatch is classified as DRIFT; no automatic repair |
+| Open5GS v2.8.0 bootstrap | IMPLEMENTED | Exact source tag is built; floating `ppa:open5gs/latest` removed |
 | Subscriber lifecycle | IMPLEMENTED IN CODE | PROVISIONED -> ACTIVE -> SUSPENDED -> RETIRED with optimistic concurrency |
 | Lifecycle postconditions | IMPLEMENTED IN CODE | ACTIVATE/SUSPEND/DEACTIVATE each require authoritative readback and state-specific postcondition |
 | Seven-subscriber lifecycle tests | TESTED IN CI | Catalog, full 7001 lifecycle and wrong-version denial covered by deterministic tests |
-| CI validation | PENDING CURRENT HEAD | Earlier head passed; renderer/preflight changes require current workflow completion |
+| CI validation | PENDING CURRENT HEAD | Renderer CI fix committed; current workflow must complete |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
 | UERANSIM gNB template | AUDITED | PLMN/TAC/SST/AMF/gNB addressing aligned with lab contract |
-| Seven-UE renderer | IMPLEMENTED | Deployment-local UE configs for 7001-7007; secrets never passed as process arguments |
+| Seven-UE renderer | IMPLEMENTED | Deployment-local UE configs for 7001-7007; external authentication references |
 | Seven-UE renderer CI validation | IMPLEMENTED | Shell syntax and seven-config deterministic rendering tested with dummy credentials |
 | UERANSIM attach | PENDING HOST | Requires actual UERANSIM/Open5GS runtime |
 | Seven live subscriber projections | NEXT | Requires actual MongoDB/Open5GS runtime and external secrets |
 | UE Internet | READY | Requires actual host routing/NAT configuration |
 | IMS/Kamailio | SCAFFOLD | Requires stable Core/data plane |
-| Asterisk/PSTN gateway | ARCHITECTURE CAPTURED | Requires lawful operator SIP trunk, numbering and SBC policy |
-| Physical USIM | BLOCKED | Requires physical compatible USIMs and provisioning process |
-| Physical LTE/5G RAN | BLOCKED | Requires RAN hardware and lawful RF authorization |
-| First physical handset | BLOCKED | Depends on RAN + USIM + regulatory gate |
-| Seven physical handsets | BLOCKED | Depends on successful first-handset test |
-| Public +48 telephony | CONDITIONAL | Only through lawful numbering/interconnect/operator arrangement |
-| Monitoring | SCAFFOLD | Implement after Core/RAN stability |
+| Physical RAN | BLOCKED | Requires lawful RF authorization, suitable hardware and conformity/location checks |
 
-## Implementation log
+## Phase 2D — UERANSIM boundary
 
-### Phase 2A — Project-72 assurance boundary
+- Existing gNB and UE templates were audited.
+- gNB lab contract: PLMN `001/01`, TAC `1`, SST `1`, AMF `10.10.0.5`, gNB `10.10.0.6`.
+- Deployment-local rendering exists for all seven UE identities.
+- Renderer validates IMSI, MCC/MNC, gNB address and external authentication material shape.
+- Authentication material is not supplied to the renderer as command-line arguments.
+- Generated runtime files are excluded from Git through `runtime/` in `.gitignore`.
+- CI uses synthetic non-production authentication values only.
 
-- Added machine-readable contracts under `project-72/contracts/`.
-- Added explicit statuses `VERIFIED`, `UNVERIFIED`, `STALE`, `CONFLICT`, `DRIFT` and `FAILED`.
-- Added `expected_version` and `idempotency_key` to mutation requests.
-- Added canonical subscriber model with `secret_refs`; authentication material is not part of repository state.
-- Added MongoDB canonical adapter in a dedicated `mini_mobile_7.canonical_subscribers` collection so canonical state is not conflated with the Open5GS projection database.
-- Added fail-closed Capability Broker.
-- Added Assurance Core and deterministic `ACTIVATE 7001` Golden Path test.
+## CI correction
 
-### Phase 2B — deterministic Core bootstrap and Open5GS boundary
+The first renderer workflow failure was caused by the script being invoked directly while its Git mode was `100644`; GitHub Actions therefore returned exit code 126. The workflow now invokes the renderer explicitly with `bash`, removing the executable-bit dependency.
 
-- Replaced the floating `ppa:open5gs/latest` installation path with a source build pinned to the official `v2.8.0` tag.
-- Kept MongoDB on the 8.0 package line.
-- Verified the pinned Open5GS v2.8.0 `open5gs-dbctl` layout: static IPv4 belongs under `slice[0].session[0].ue.ipv4`; subscriber status is represented by `subscriber_status` with values 0/1.
-- Added the Open5GS projection adapter under `adapters/open5gs/`.
-- Added a runtime `from_mongodb()` constructor; the MongoDB URI remains deployment-provided.
-- Activation advances canonical state using optimistic concurrency and projects the resulting ACTIVE version to Open5GS.
-- Authentication material is resolved only through an external `secret_ref` resolver; no supplied credentials are copied into Git.
-- Normalized `env://` secret references to shell-safe environment variable names without exposing values.
-- Added authoritative Open5GS readback with deterministic fingerprinting.
-- Added explicit `MISMATCH -> DRIFT` classification in Assurance Core.
-
-### Phase 2C — seven-subscriber lifecycle
-
-- Added deterministic canonical catalog for 7001-7007.
-- Enforced the UE address invariant `10.20.0.11` through `10.20.0.17`.
-- Added lifecycle state machine: `PROVISIONED -> ACTIVE -> SUSPENDED -> RETIRED`.
-- Added optimistic-concurrency lifecycle application.
-- Extended Open5GS projection to ACTIVE/SUSPENDED/RETIRED using the v2.8.0 subscriber-status field.
-- Added state-specific authoritative postconditions.
-- Added deterministic seven-subscriber lifecycle tests.
-- Kept PSTN outbound disabled in the canonical catalog by default.
-
-### Runtime gate
-
-- Added `scripts/project-72-preflight.sh` and `make preflight`.
-- The gate blocks execution when Ubuntu 22.04, MongoDB, Open5GS, `ogstun`, UE routing, IPv4 forwarding, MongoDB reachability or required external authentication references are not ready.
-- Firewall INPUT policy is reported and a non-fail-closed default is surfaced as a warning requiring operator review.
-- Preflight never prints authentication secret values.
-- Runtime provisioning remains an explicit controlled-host action; the default `make provision-seven` path is dry-run.
-
-### Phase 2D — UERANSIM boundary
-
-- Audited the existing gNB and UE templates.
-- Confirmed the gNB lab contract uses PLMN `001/01`, TAC `1`, SST `1`, AMF `10.10.0.5` and gNB `10.10.0.6`.
-- Added deployment-local rendering for all seven UE identities.
-- Added strict validation for IMSI, MCC/MNC, gNB address and external authentication material shape.
-- Changed secret transport so authentication material is not supplied to Python as process arguments.
-- Added CI coverage using non-production dummy authentication values only.
-- Generated UE files are runtime-local and excluded from Git.
+The assurance/lifecycle suite itself passed before the renderer step failed. The corrected HEAD requires a fresh workflow run before this status can be marked GREEN.
 
 ## Validation note
 
-CI validates deterministic source-level behavior only. The current post-renderer HEAD has a workflow pending. No live Open5GS deployment, UE attach, RAN session, IMS call or public telephony interconnect has been claimed.
+CI validates deterministic source-level behavior only. No live Open5GS deployment, UE attach, RAN session, IMS call or public telephony interconnect has been claimed.
 
 ## Important limitation
 
-The repository changes above do not claim that a live Open5GS core, RAN, IMS or public telephony interconnect is operational until the actual controlled host and external dependencies have been tested.
+The repository can prepare and validate the controlled lab configuration, but it cannot prove physical RF operation, lawful spectrum use, SIM/eSIM provisioning or real UE attachment without the actual deployment host, RAN hardware, USIM/eSIM credentials and required authorization.
