@@ -2,6 +2,17 @@
 
 This package is the Project-72 boundary between the canonical subscriber store and the Open5GS MongoDB projection.
 
+## Open5GS v2.8.0 compatibility
+
+The adapter targets the `open5gs.subscribers` document structure used by the pinned Open5GS v2.8.0 database tooling:
+
+- subscriber documents contain `schema_version`, `imsi`, `security`, `ambr`, `subscriber_status` and `slice`;
+- the static UE IPv4 address is stored at `slice[0].session[0].ue.ipv4`;
+- subscriber security uses `k`, `opc` and `amf`;
+- APN/session data is represented inside `slice[].session[]`.
+
+The adapter does not copy authentication material into source control. It resolves it from `secret_ref` only during execution.
+
 ## Invariants
 
 1. The canonical subscriber store is the source of desired state.
@@ -11,10 +22,21 @@ This package is the Project-72 boundary between the canonical subscriber store a
 5. No Ki/OPc/SQN or other authentication material is stored in Git.
 6. A projection replay is idempotent when its assurance marker already matches the canonical version and subscriber identity.
 7. A projection newer than canonical state is rejected as a conflict/drift condition.
+8. Drift detection has no repair side effect. Repair requires a separate authorized capability and assurance cycle.
 
 ## Runtime wiring
 
-The production constructor should receive the `mini_mobile_7` canonical repository, the Open5GS `open5gs.subscribers` collection, and an external `SecretResolver`.
+For a real Open5GS/MongoDB deployment, construct the adapter with:
+
+```python
+adapter = Open5GSAdapter.from_mongodb(
+    canonical=canonical_repository,
+    mongodb_uri=os.environ["OPEN5GS_DB_URI"],
+    secret_resolver=secret_resolver,
+)
+```
+
+The URI must be supplied by the deployment environment; credentials are not stored in this repository.
 
 The adapter intentionally does not expose a public HTTP endpoint and does not provide public-network routing capabilities.
 
@@ -25,6 +47,8 @@ The adapter intentionally does not expose a public HTTP endpoint and does not pr
 - observed canonical version marker,
 - `ACTIVE` / `ABSENT` / `MISMATCH` state,
 - deterministic SHA-256 fingerprint,
-- target IMSI and assurance metadata.
+- target IMSI,
+- projected `data` and `ims` service state,
+- assurance metadata.
 
 `MISMATCH` is classified by Assurance Core as `DRIFT`; it cannot become `VERIFIED` through a postcondition alone.
