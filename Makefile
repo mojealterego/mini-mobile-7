@@ -5,7 +5,7 @@ help:
 	@echo "  make validate          - validate the Linux host prerequisites"
 	@echo "  make bootstrap-ubuntu22 - install pinned lab host prerequisites"
 	@echo "  make build-ueransim   - build pinned UERANSIM"
-	@echo "  make assurance-test   - run Project-72 assurance, adapter, lifecycle, idempotency and concurrency tests"
+	@echo "  make assurance-test   - run Project-72 assurance, adapter, lifecycle, idempotency, concurrency and runtime-wiring tests"
 	@echo "  make preflight        - run the Project-72 runtime safety gate"
 	@echo "  make render-ueransim  - render deployment-local UE configs from external secrets"
 	@echo "  make provision-seven   - dry-run seven-subscriber runtime provisioning"
@@ -26,6 +26,7 @@ assurance-test:
 		project_72.assurance_core.test_lifecycle \
 		project_72.assurance_core.test_idempotency \
 		project_72.assurance_core.test_concurrency \
+		project_72.assurance_core.test_runtime_wiring \
 		adapters.open5gs.test_adapter \
 		adapters.open5gs.test_assurance_integration -v
 
