@@ -17,7 +17,7 @@ from project_72.assurance_core.assurance import AssuranceCore
 from project_72.assurance_core.broker import CapabilityBroker, Policy
 from project_72.assurance_core.catalog import build_seven_subscriber_catalog
 from project_72.assurance_core.lifecycle_postconditions import lifecycle_postcondition
-from project_72.assurance_core.models import AssuranceStatus, ExecutionRequest
+from project_72.assurance_core.models import AssuranceStatus, ExecutionRequest, SubscriberStatus
 from project_72.assurance_core.store import MongoSubscriberRepository, SubscriberNotFoundError
 
 
@@ -54,8 +54,17 @@ def make_core(mongodb_uri: str) -> tuple[MongoSubscriberRepository, Open5GSAdapt
     return canonical, adapter, core
 
 
+def _catalog_match(current, expected) -> bool:
+    return (
+        current.imsi == expected.imsi
+        and current.ue_ip == expected.ue_ip
+        and current.secret_refs == expected.secret_refs
+        and current.services == expected.services
+    )
+
+
 def provision_execute(mongodb_uri: str, bootstrap_canonical: bool) -> int:
-    canonical, _adapter, core = make_core(mongodb_uri)
+    canonical, adapter, core = make_core(mongodb_uri)
     catalog = build_seven_subscriber_catalog()
     failures = 0
 
@@ -74,17 +83,37 @@ def provision_execute(mongodb_uri: str, bootstrap_canonical: bool) -> int:
             current = canonical.insert(expected)
             print(f"BOOTSTRAP {current.subscriber_id} PROVISIONED v{current.version}")
 
-        if (
-            current.imsi != expected.imsi
-            or current.ue_ip != expected.ue_ip
-            or current.secret_refs != expected.secret_refs
-            or current.services != expected.services
-            or current.version != expected.version
-            or current.status is not expected.status
-        ):
+        if not _catalog_match(current, expected):
             print(
-                f"BLOCK {expected.subscriber_id}: canonical state does not match the "
-                "deterministic seven-subscriber catalog",
+                f"BLOCK {expected.subscriber_id}: immutable canonical fields do not match "
+                "the deterministic seven-subscriber catalog",
+                file=sys.stderr,
+            )
+            failures += 1
+            continue
+
+        if current.status is SubscriberStatus.ACTIVE:
+            readback = adapter.readback(current)
+            postcondition_ok, postcondition_reason = lifecycle_postcondition("ACTIVE")(readback)
+            if readback.observed_version == current.version and postcondition_ok:
+                print(
+                    f"{current.subscriber_id} VERIFIED "
+                    f"observed_version={readback.observed_version} "
+                    "reason=already-active-authoritative-readback"
+                )
+            else:
+                print(
+                    f"BLOCK {current.subscriber_id}: active canonical state failed "
+                    f"authoritative readback/postcondition: {postcondition_reason}",
+                    file=sys.stderr,
+                )
+                failures += 1
+            continue
+
+        if current.status is not SubscriberStatus.PROVISIONED or current.version != expected.version:
+            print(
+                f"BLOCK {expected.subscriber_id}: lifecycle state is "
+                f"{current.status.value} v{current.version}; expected PROVISIONED v{expected.version}",
                 file=sys.stderr,
             )
             failures += 1
