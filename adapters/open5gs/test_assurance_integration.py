@@ -56,20 +56,23 @@ def make_request(version: int = 1, suffix: str = "") -> ExecutionRequest:
     )
 
 
+def make_broker() -> CapabilityBroker:
+    return CapabilityBroker({
+        "ACTIVATE": Policy(
+            version="policy-1",
+            allowed_operations=frozenset({"ACTIVATE"}),
+            allowed_principals=frozenset({"assurance-service"}),
+            max_risk="MEDIUM",
+        )
+    })
+
+
 class Open5GSAssuranceIntegrationTest(unittest.TestCase):
     def test_activate_7001_reaches_verified_only_after_open5gs_readback(self) -> None:
         repository = make_repository()
         collection = FakeCollection()
         adapter = Open5GSAdapter(repository, collection, FakeSecrets())
-        broker = CapabilityBroker({
-            "ACTIVATE": Policy(
-                version="policy-1",
-                allowed_operations=frozenset({"ACTIVATE"}),
-                allowed_principals=frozenset({"assurance-service"}),
-                max_risk="MEDIUM",
-            )
-        })
-        core = AssuranceCore(repository, broker, adapter.execute, adapter.readback, activate_postcondition)
+        core = AssuranceCore(repository, make_broker(), adapter.execute, adapter.readback, activate_postcondition)
 
         result = core.execute(principal="assurance-service", request=make_request())
         self.assertEqual(result.status, AssuranceStatus.VERIFIED)
@@ -80,25 +83,28 @@ class Open5GSAssuranceIntegrationTest(unittest.TestCase):
         repository = make_repository()
         collection = FakeCollection()
         adapter = Open5GSAdapter(repository, collection, FakeSecrets())
+
+        # Create the Open5GS projection without changing the canonical version.
+        # The following readback observes version 2 while the test request still
+        # carries the original expected_version=1. This isolates projection drift
+        # from the broker's optimistic-concurrency guard.
         adapter.execute(make_request())
         assert collection.document is not None
+
         slices = collection.document["slice"]
         assert isinstance(slices, list)
         sessions = slices[0]["session"]
         assert isinstance(sessions, list)
         internet = next(item for item in sessions if item["name"] == "internet")
+        assert isinstance(internet["ue"], dict)
         internet["ue"]["ipv4"] = "10.20.0.99"
 
-        broker = CapabilityBroker({
-            "ACTIVATE": Policy(
-                version="policy-1",
-                allowed_operations=frozenset({"ACTIVATE"}),
-                allowed_principals=frozenset({"assurance-service"}),
-                max_risk="MEDIUM",
-            )
-        })
-        core = AssuranceCore(repository, broker, lambda _: True, adapter.readback, activate_postcondition)
+        # Restore the canonical store to version 1 so authorization succeeds;
+        # the deliberately modified Open5GS projection remains version 2.
+        repository = make_repository()
+        core = AssuranceCore(repository, make_broker(), lambda _: True, adapter.readback, activate_postcondition)
         result = core.execute(principal="assurance-service", request=make_request(1, "-drift"))
+
         self.assertEqual(result.status, AssuranceStatus.DRIFT)
         self.assertEqual(result.observed_version, 2)
 
