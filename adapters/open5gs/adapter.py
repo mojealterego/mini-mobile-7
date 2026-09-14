@@ -43,6 +43,22 @@ class Open5GSAdapter:
     database_name: str = "open5gs"
     collection_name: str = "subscribers"
 
+    @classmethod
+    def from_mongodb(
+        cls,
+        canonical: SubscriberRepository,
+        mongodb_uri: str,
+        secret_resolver: SecretResolver,
+        *,
+        database_name: str = "open5gs",
+    ) -> "Open5GSAdapter":
+        """Create a runtime adapter without embedding database credentials."""
+        from pymongo import MongoClient
+
+        client = MongoClient(mongodb_uri, serverSelectionTimeoutMS=5000)
+        collection = client[database_name]["subscribers"]
+        return cls(canonical, collection, secret_resolver, database_name=database_name)
+
     def execute(self, request: ExecutionRequest) -> bool:
         if request.operation != "ACTIVATE":
             raise Open5GSAdapterError(f"unsupported Open5GS operation: {request.operation}")
@@ -65,7 +81,6 @@ class Open5GSAdapter:
             )
             self.canonical.put(target, expected_version=request.expected_version)
         elif current.version == request.expected_version + 1 and current.status is SubscriberStatus.ACTIVE:
-            # Recovery after a canonical commit succeeded but projection failed.
             target = current
         else:
             raise Open5GSAdapterError(
@@ -130,11 +145,7 @@ class Open5GSAdapter:
             raise Open5GSAdapterError("secret resolver must provide k, opc and amf")
 
         sessions: list[dict[str, Any]] = [
-            _session(
-                name="internet",
-                qos_index=9,
-                ue_ipv4=subscriber.ue_ip,
-            )
+            _session(name="internet", qos_index=9, ue_ipv4=subscriber.ue_ip)
         ]
         if subscriber.services.get("ims", False):
             sessions.append(_session(name="ims", qos_index=5, ue_ipv4=None))
@@ -147,13 +158,7 @@ class Open5GSAdapter:
             "mme_host": [],
             "mm_realm": [],
             "purge_flag": [],
-            "slice": [
-                {
-                    "sst": 1,
-                    "default_indicator": True,
-                    "session": sessions,
-                }
-            ],
+            "slice": [{"sst": 1, "default_indicator": True, "session": sessions}],
             "security": {
                 "k": auth["k"],
                 "op": None,
@@ -166,7 +171,7 @@ class Open5GSAdapter:
             },
             "access_restriction_data": 32,
             "network_access_mode": 0,
-            "subscriber_status": 1,
+            "subscriber_status": 0,
             "operator_determined_barring": 0,
             "subscribed_rau_tau_timer": 12,
             "__v": 0,
