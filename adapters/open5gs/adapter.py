@@ -5,7 +5,12 @@ import ipaddress
 from dataclasses import dataclass
 from typing import Any, Mapping, Protocol
 
-from project_72.assurance_core.models import AuthoritativeReadback, ExecutionRequest, Subscriber
+from project_72.assurance_core.models import (
+    AuthoritativeReadback,
+    ExecutionRequest,
+    Subscriber,
+    SubscriberStatus,
+)
 from project_72.assurance_core.store import SubscriberRepository
 
 from .secrets import SecretResolver
@@ -29,12 +34,7 @@ class Open5GSAdapterError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class Open5GSAdapter:
-    """Project canonical subscribers into Open5GS MongoDB and read them back.
-
-    Open5GS remains a projection/authoritative runtime target. The canonical
-    subscriber repository is the sole source of desired state. Authentication
-    material is resolved only at execution time through SecretResolver.
-    """
+    """Project canonical state into Open5GS and provide authoritative readback."""
 
     canonical: SubscriberRepository
     collection: Open5GSCollection
@@ -46,31 +46,46 @@ class Open5GSAdapter:
         if request.operation != "ACTIVATE":
             raise Open5GSAdapterError(f"unsupported Open5GS operation: {request.operation}")
 
-        subscriber = self.canonical.get(request.target)
-        if subscriber.version != request.expected_version:
-            raise Open5GSAdapterError(
-                f"canonical version conflict for {subscriber.subscriber_id}: "
-                f"expected {request.expected_version}, current {subscriber.version}"
+        current = self.canonical.get(request.target)
+        if current.version == request.expected_version:
+            if current.status is not SubscriberStatus.PROVISIONED:
+                raise Open5GSAdapterError(
+                    f"subscriber {current.subscriber_id} cannot be activated from {current.status.value}"
+                )
+            target = Subscriber(
+                subscriber_id=current.subscriber_id,
+                imsi=current.imsi,
+                ue_ip=current.ue_ip,
+                version=current.version + 1,
+                status=SubscriberStatus.ACTIVE,
+                secret_refs=current.secret_refs,
+                services=current.services,
+                msisdn=current.msisdn,
             )
-        if subscriber.status.value != "ACTIVE":
+            self.canonical.put(target, expected_version=request.expected_version)
+        elif current.version == request.expected_version + 1 and current.status is SubscriberStatus.ACTIVE:
+            # Recovery path after a canonical commit succeeded but projection did not.
+            target = current
+        else:
             raise Open5GSAdapterError(
-                f"subscriber {subscriber.subscriber_id} is not ACTIVE in canonical state"
+                f"canonical version conflict for {current.subscriber_id}: "
+                f"expected {request.expected_version}, current {current.version}"
             )
 
-        existing = self.collection.find_one({"imsi": subscriber.imsi})
+        existing = self.collection.find_one({"imsi": target.imsi})
         existing_marker = _assurance_marker(existing)
         if existing_marker is not None:
             existing_version = int(existing_marker.get("canonical_version", 0))
-            if existing_version == subscriber.version:
+            if existing_version == target.version and _projection_matches(target, existing):
                 return True
-            if existing_version > subscriber.version:
+            if existing_version > target.version:
                 raise Open5GSAdapterError(
-                    f"Open5GS projection is newer than canonical state for {subscriber.subscriber_id}"
+                    f"Open5GS projection is newer than canonical state for {target.subscriber_id}"
                 )
 
-        auth = self.secret_resolver.resolve(subscriber.secret_refs["authentication"])
-        document = self._build_document(subscriber, auth)
-        self.collection.replace_one({"imsi": subscriber.imsi}, document, upsert=True)
+        auth = self.secret_resolver.resolve(target.secret_refs["authentication"])
+        document = self._build_document(target, auth)
+        self.collection.replace_one({"imsi": target.imsi}, document, upsert=True)
         return True
 
     def readback(self, subscriber_id: str) -> AuthoritativeReadback:
@@ -90,14 +105,13 @@ class Open5GSAdapter:
         marker = _assurance_marker(document) or {}
         observed_version = int(marker.get("canonical_version", 0))
         state = "ACTIVE" if _projection_matches(subscriber, document) else "MISMATCH"
-        fingerprint = _fingerprint(document)
         return AuthoritativeReadback(
             request_id="readback",
             source=f"{self.database_name}.{self.collection_name}",
             target=subscriber_id,
             observed_version=observed_version,
             state=state,
-            fingerprint=fingerprint,
+            fingerprint=_fingerprint(document),
             details={
                 "imsi": document.get("imsi"),
                 "marker": dict(marker),
@@ -130,7 +144,10 @@ class Open5GSAdapter:
                             "name": "internet",
                             "type": 3,
                             "qos": {"index": 9, "arp": {"priority": 8}},
-                            "ambr": {"downlink": {"value": 1, "unit": 3}, "uplink": {"value": 1, "unit": 3}},
+                            "ambr": {
+                                "downlink": {"value": 1, "unit": 3},
+                                "uplink": {"value": 1, "unit": 3},
+                            },
                         }
                     ],
                 }
@@ -153,12 +170,14 @@ def _assurance_marker(document: Mapping[str, Any] | None) -> Mapping[str, Any] |
 
 def _projection_matches(subscriber: Subscriber, document: Mapping[str, Any]) -> bool:
     marker = _assurance_marker(document) or {}
+    ue = document.get("ue")
     return (
         document.get("imsi") == subscriber.imsi
         and marker.get("subscriber_id") == subscriber.subscriber_id
         and int(marker.get("canonical_version", 0)) == subscriber.version
         and marker.get("status") == "ACTIVE"
-        and document.get("ue", {}).get("ipv4") == subscriber.ue_ip
+        and isinstance(ue, Mapping)
+        and ue.get("ipv4") == subscriber.ue_ip
     )
 
 
