@@ -8,15 +8,12 @@
 *.pfx
 secrets/
 private/
-credentials/
 local/
 *.local.yaml
 *.local.yml
 
-# Generated runtime configuration containing resolved authentication material
-runtime/
-
 # Local runtime state
+runtime/
 *.log
 *.pid
 *.sock
