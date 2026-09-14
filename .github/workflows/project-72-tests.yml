@@ -1,0 +1,26 @@
+name: Project-72 tests
+
+on:
+  push:
+    branches:
+      - main
+      - project-72/phase-2a
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  assurance-tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run Project-72 assurance tests
+        run: make assurance-test
