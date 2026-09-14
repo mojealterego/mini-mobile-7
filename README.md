@@ -276,41 +276,37 @@ There is no automatic reconciliation of conflicting canonical identity data. A m
 
 **Gate 4B code status: IMPLEMENTED. Host/database acceptance: PENDING.**
 
-## 2026-09-15 — Gate 4D preflight URI binding
+## 2026-09-15 — Gate 4D preflight URI and durable-store binding
 
-Identified and fixed a runtime safety gap: the provisioner accepted `--mongodb-uri` for the actual execution path, while the preflight script could independently read `MM7_MONGODB_URI` from the inherited environment. That allowed preflight to validate one MongoDB endpoint while execution could mutate another.
+Expanded the Gate 4D hardening across both runtime databases.
 
-The runtime path now passes the exact execution `mongodb_uri` into `run_preflight()`, and the subprocess environment is explicitly set to that URI before the preflight starts. This makes the safety gate and the mutation target identical by construction.
-
-Added a runtime-wiring regression test requiring:
-
-```text
-run_preflight(mongodb_uri)
-        |
-        +--> MM7_MONGODB_URI = mongodb_uri
-        |
-        +--> preflight
-        |
-        +--> only then make_core(mongodb_uri, ...)
-```
+1. The execution MongoDB URI is now explicitly injected into the preflight environment, preventing preflight/execution endpoint divergence.
+2. The durable idempotency MongoDB URI is also explicitly injected into preflight.
+3. Preflight now performs a separate MongoDB `ping` against the durable idempotency store before runtime mutation is permitted.
+4. Runtime `--execute` already fails closed when no durable idempotency URI is supplied; preflight now independently enforces that invariant.
+5. Found and corrected an additional runtime bug in the already-active path: `Open5GSAdapter.readback()` accepts a subscriber ID, so the provisioner now passes `current.subscriber_id` rather than the whole subscriber object.
+6. Added regression coverage for all of the above wiring.
 
 Affected files:
 - `scripts/project-72-provision-seven.py`
+- `scripts/project-72-preflight.sh`
 - `project_72/assurance_core/test_runtime_wiring.py`
 
 Implementation commits:
-- `99007e5c1db55b72cd4d243e28c6bfd43b947ab5` — bind runtime preflight to execution MongoDB URI
-- `67e5d6c2a2e2faeda49644a3aac1e1155eb79a78` — add regression coverage
+- `dff72a1844e7b0945e7847c949e690b8aa79bdb1` — bind both runtime database URIs and correct active readback target
+- `8dbe824b6442c8d185c74d16afdfa808ee6156fd` — runtime wiring regression coverage
+- `d0418a35673f872661c4af0b8b9e759f236a0f3b` — durable idempotency connectivity gate
+- `0bc1fc119ac025e8420639a2ba2a2d8ce32f3cdc` — preflight/idempotency/readback regression coverage
 
-Validation: static runtime-wiring coverage updated. CI must validate the new commits before they are marked green.
+Validation: source-level runtime wiring tests now cover the execution database, durable idempotency database, mandatory preflight and active readback contract. The live database and Open5GS gates remain host-dependent.
 
-**Gate 4D status: HARDENED CODE. LIVE OPEN5GS PROJECTION/READBACK: NEXT.**
+**Gate 4D status: CODE HARDENED. LIVE DATABASE/OPEN5GS ACCEPTANCE: PENDING.**
 
 ## CI validation
 
-The Project-72 workflow validates the assurance suite and UERANSIM renderer. Completed run #110 passed its principal assurance and renderer steps. Run #120 also completed successfully for the bootstrap-hardening revision: `assurance-tests` passed and the UERANSIM renderer validation passed.
+The Project-72 workflow validates the assurance suite and UERANSIM renderer. Run #120 completed successfully for the bootstrap-hardening revision: `assurance-tests` passed and the UERANSIM renderer validation passed.
 
-The URI-binding commits above have triggered a newer CI run; its final result must be checked before marking this latest change CI-green.
+The subsequent URI-binding, durable-store and readback commits triggered newer CI runs. Their final results must be checked before marking this latest revision CI-green.
 
 ## Implementation commit trail
 
@@ -335,6 +331,10 @@ The URI-binding commits above have triggered a newer CI run; its final result mu
 | `adfff92ed7e4f5abb74a15faf30438d7f779046b` | Canonical bootstrap/idempotency tests |
 | `99007e5c1db55b72cd4d243e28c6bfd43b947ab5` | Bind preflight to execution MongoDB URI |
 | `67e5d6c2a2e2faeda49644a3aac1e1155eb79a78` | URI-binding regression test |
+| `dff72a1844e7b0945e7847c949e690b8aa79bdb1` | Bind durable URI + correct active readback |
+| `8dbe824b6442c8d185c74d16afdfa808ee6156fd` | Runtime wiring regression coverage |
+| `d0418a35673f872661c4af0b8b9e759f236a0f3b` | Durable idempotency connectivity preflight |
+| `0bc1fc119ac025e8420639a2ba2a2d8ce32f3cdc` | Preflight/idempotency/readback regression coverage |
 
 ## Current status — 2026-09-15
 
@@ -356,6 +356,8 @@ The URI-binding commits above have triggered a newer CI run; its final result mu
 - mandatory runtime preflight
 - canonical bootstrap conflict protection
 - runtime/preflight MongoDB URI binding
+- durable idempotency database connectivity preflight
+- active-subscriber authoritative readback target correction
 - IMS/Kamailio/Asterisk security boundary templates
 - CI assurance and renderer validation
 
@@ -363,6 +365,7 @@ The URI-binding commits above have triggered a newer CI run; its final result mu
 
 - Ubuntu 22.04 host preflight PASS
 - live MongoDB canonical store acceptance
+- live durable idempotency store acceptance
 - live Open5GS projection for 7001–7007
 - authoritative Open5GS readback on target host
 - UERANSIM attach
@@ -388,7 +391,7 @@ Gate 4B  Canonical 7001-7007 bootstrap        [CODE IMPLEMENTED / HOST PENDING]
    |
 Gate 4C  UERANSIM deployment configuration    [CODE IMPLEMENTED / HOST PENDING]
    |
-Gate 4D  Open5GS projection + readback        [NEXT]
+Gate 4D  Open5GS projection + readback        [CODE HARDENED / HOST PENDING]
    |
 Gate 4E  UERANSIM attach                      [HOST]
    |
