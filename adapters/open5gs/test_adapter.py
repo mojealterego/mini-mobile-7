@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import unittest
 
+from adapters.open5gs.adapter import Open5GSAdapter
 from project_72.assurance_core.models import ExecutionRequest, Subscriber, SubscriberStatus
 from project_72.assurance_core.store import InMemorySubscriberRepository
-from adapters.open5gs.adapter import Open5GSAdapter
 
 
 class FakeSecrets:
@@ -60,16 +60,28 @@ class Open5GSAdapterTest(unittest.TestCase):
         self.assertEqual(current.version, 2)
         self.assertEqual(current.status, SubscriberStatus.ACTIVE)
         assert self.collection.document is not None
-        self.assertEqual(self.collection.document["imsi"], "001010000000001")
-        marker = self.collection.document["mm7_assurance"]
+        document = self.collection.document
+        self.assertEqual(document["schema_version"], 1)
+        self.assertEqual(document["imsi"], "001010000000001")
+        self.assertEqual(document["subscriber_status"], 1)
+        slices = document["slice"]
+        assert isinstance(slices, list)
+        sessions = slices[0]["session"]
+        assert isinstance(sessions, list)
+        internet = next(item for item in sessions if item["name"] == "internet")
+        ims = next(item for item in sessions if item["name"] == "ims")
+        self.assertEqual(internet["ue"]["ipv4"], "10.20.0.11")
+        self.assertNotIn("ue", ims)
+        marker = document["mm7_assurance"]
         assert isinstance(marker, dict)
         self.assertEqual(marker["canonical_version"], 2)
 
-    def test_readback_confirms_projected_state(self) -> None:
+    def test_readback_confirms_projected_state_and_services(self) -> None:
         self.adapter.execute(self.request)
         result = self.adapter.readback("7001")
         self.assertEqual(result.observed_version, 2)
         self.assertEqual(result.state, "ACTIVE")
+        self.assertEqual(result.details["services"], {"data": True, "ims": True})
         self.assertTrue(result.fingerprint)
 
     def test_replay_is_idempotent(self) -> None:
