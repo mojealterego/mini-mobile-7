@@ -2,7 +2,8 @@
 """Provision the seven canonical subscribers into Open5GS through Project-72 assurance.
 
 Default mode is dry-run. Use --execute only on the controlled Ubuntu/Open5GS host.
-Authentication material is resolved externally from env:// secret references.
+Use --bootstrap-canonical together with --execute to create missing initial
+PROVISIONED records. Authentication material is resolved externally.
 """
 from __future__ import annotations
 
@@ -17,7 +18,7 @@ from project_72.assurance_core.broker import CapabilityBroker, Policy
 from project_72.assurance_core.catalog import build_seven_subscriber_catalog
 from project_72.assurance_core.lifecycle_postconditions import lifecycle_postcondition
 from project_72.assurance_core.models import AssuranceStatus, ExecutionRequest
-from project_72.assurance_core.store import MongoSubscriberRepository
+from project_72.assurance_core.store import MongoSubscriberRepository, SubscriberNotFoundError
 
 
 def build_request(subscriber_id: str, version: int, operation: str) -> ExecutionRequest:
@@ -35,16 +36,14 @@ def build_request(subscriber_id: str, version: int, operation: str) -> Execution
 def make_core(mongodb_uri: str) -> tuple[MongoSubscriberRepository, Open5GSAdapter, AssuranceCore]:
     canonical = MongoSubscriberRepository.from_uri(mongodb_uri)
     adapter = Open5GSAdapter.from_mongodb(canonical, mongodb_uri, EnvironmentSecretResolver())
-    policies = {
-        operation: Policy(
+    broker = CapabilityBroker({
+        "ACTIVATE": Policy(
             version="runtime-policy-1",
-            allowed_operations=frozenset({operation}),
+            allowed_operations=frozenset({"ACTIVATE"}),
             allowed_principals=frozenset({"project-72-runtime"}),
             max_risk="MEDIUM",
         )
-        for operation in ("ACTIVATE", "SUSPEND", "DEACTIVATE")
-    }
-    broker = CapabilityBroker(policies)
+    })
     core = AssuranceCore(
         canonical,
         broker,
@@ -55,27 +54,46 @@ def make_core(mongodb_uri: str) -> tuple[MongoSubscriberRepository, Open5GSAdapt
     return canonical, adapter, core
 
 
-def provision_execute(mongodb_uri: str) -> int:
+def provision_execute(mongodb_uri: str, bootstrap_canonical: bool) -> int:
     canonical, _adapter, core = make_core(mongodb_uri)
     catalog = build_seven_subscriber_catalog()
     failures = 0
 
-    for subscriber in catalog:
-        current = canonical.get(subscriber.subscriber_id)
-        if current.version != subscriber.version or current.status is not subscriber.status:
+    for expected in catalog:
+        try:
+            current = canonical.get(expected.subscriber_id)
+        except SubscriberNotFoundError:
+            if not bootstrap_canonical:
+                print(
+                    f"BLOCK {expected.subscriber_id}: canonical record is absent; "
+                    "rerun with --bootstrap-canonical --execute to create it",
+                    file=sys.stderr,
+                )
+                failures += 1
+                continue
+            current = canonical.insert(expected)
+            print(f"BOOTSTRAP {current.subscriber_id} PROVISIONED v{current.version}")
+
+        if (
+            current.imsi != expected.imsi
+            or current.ue_ip != expected.ue_ip
+            or current.secret_refs != expected.secret_refs
+            or current.services != expected.services
+            or current.version != expected.version
+            or current.status is not expected.status
+        ):
             print(
-                f"BLOCK {subscriber.subscriber_id}: canonical state is "
-                f"{current.status.value}/v{current.version}; expected "
-                f"{subscriber.status.value}/v{subscriber.version}",
+                f"BLOCK {expected.subscriber_id}: canonical state does not match the "
+                "deterministic seven-subscriber catalog",
                 file=sys.stderr,
             )
             failures += 1
             continue
 
-        request = build_request(subscriber.subscriber_id, current.version, "ACTIVATE")
+        request = build_request(expected.subscriber_id, current.version, "ACTIVATE")
         result = core.execute(principal="project-72-runtime", request=request)
         print(
-            f"{subscriber.subscriber_id} {result.status.value} "
+            f"{expected.subscriber_id} {result.status.value} "
             f"observed_version={result.observed_version} reason={result.reason}"
         )
         if result.status is not AssuranceStatus.VERIFIED:
@@ -86,7 +104,12 @@ def provision_execute(mongodb_uri: str) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--execute", action="store_true", help="perform runtime activation")
+    parser.add_argument("--execute", action="store_true", help="perform runtime mutation")
+    parser.add_argument(
+        "--bootstrap-canonical",
+        action="store_true",
+        help="insert missing canonical PROVISIONED records before activation",
+    )
     parser.add_argument(
         "--mongodb-uri",
         default=os.environ.get("MM7_MONGODB_URI", "mongodb://localhost/open5gs"),
@@ -106,7 +129,7 @@ def main() -> int:
         print("DRY-RUN: no MongoDB/Open5GS mutation performed")
         return 0
 
-    return provision_execute(args.mongodb_uri)
+    return provision_execute(args.mongodb_uri, args.bootstrap_canonical)
 
 
 if __name__ == "__main__":
