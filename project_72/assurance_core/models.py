@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping
@@ -42,6 +43,14 @@ class Subscriber:
             raise ValueError("imsi must contain exactly 15 digits")
         if self.version < 1:
             raise ValueError("version must be >= 1")
+        try:
+            address = ipaddress.ip_address(self.ue_ip)
+        except ValueError as exc:
+            raise ValueError("ue_ip must be a valid IP address") from exc
+        if address.version != 4 or not address.is_private:
+            raise ValueError("ue_ip must be a private IPv4 address")
+        if not isinstance(self.status, SubscriberStatus):
+            raise ValueError("status must be SubscriberStatus")
         if not self.secret_refs.get("authentication"):
             raise ValueError("authentication secret_ref is required")
 
