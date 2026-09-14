@@ -16,18 +16,16 @@ from project_72.assurance_core.store import InMemorySubscriberRepository
 
 class IdempotencyBindingTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.repository = InMemorySubscriberRepository()
-        self.repository.insert(
-            Subscriber(
-                subscriber_id="7001",
-                imsi="001010000000001",
-                ue_ip="10.20.0.11",
-                version=1,
-                status=SubscriberStatus.PROVISIONED,
-                secret_refs={"authentication": "env://MINI_MOBILE_7/7001"},
-                services={"ims": True, "data": True},
-            )
+        subscriber = Subscriber(
+            subscriber_id="7001",
+            imsi="001010000000001",
+            ue_ip="10.20.0.11",
+            version=1,
+            status=SubscriberStatus.PROVISIONED,
+            secret_refs={"authentication": "env://MINI_MOBILE_7/7001"},
+            services={"ims": True, "data": True},
         )
+        self.repository = InMemorySubscriberRepository({"7001": subscriber})
         self.executions = 0
         broker = CapabilityBroker(
             {
