@@ -16,7 +16,7 @@ from project_72.assurance_core.catalog import build_seven_subscriber_catalog
 from project_72.assurance_core.idempotency import MongoIdempotencyStore
 from project_72.assurance_core.lifecycle_postconditions import lifecycle_postcondition
 from project_72.assurance_core.models import AssuranceStatus, ExecutionRequest, SubscriberStatus
-from project_72.assurance_core.store import MongoSubscriberRepository, SubscriberNotFoundError
+from project_72.assurance_core.store import MongoSubscriberRepository, SubscriberNotFoundError, StoreConflictError
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -105,7 +105,12 @@ def provision_execute(mongodb_uri: str, idempotency_uri: str, bootstrap_canonica
                 )
                 failures += 1
                 continue
-            current = canonical.insert(expected)
+            try:
+                current = canonical.ensure_initial(expected)
+            except StoreConflictError as exc:
+                print(f"BLOCK {expected.subscriber_id}: canonical bootstrap conflict: {exc}", file=sys.stderr)
+                failures += 1
+                continue
             print(f"BOOTSTRAP {current.subscriber_id} PROVISIONED v{current.version}")
 
         if not _catalog_match(current, expected):
