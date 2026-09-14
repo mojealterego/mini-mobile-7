@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 import sys
+from pathlib import Path
 
 from adapters.open5gs.adapter import Open5GSAdapter
 from adapters.open5gs.secrets import EnvironmentSecretResolver
@@ -17,6 +19,10 @@ from project_72.assurance_core.models import AssuranceStatus, ExecutionRequest, 
 from project_72.assurance_core.store import MongoSubscriberRepository, SubscriberNotFoundError
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PREFLIGHT_SCRIPT = PROJECT_ROOT / "scripts" / "project-72-preflight.sh"
+
+
 def build_request(subscriber_id: str, version: int, operation: str) -> ExecutionRequest:
     request_id = f"req-{operation.lower()}-{subscriber_id}-runtime-v{version}"
     return ExecutionRequest(
@@ -27,6 +33,24 @@ def build_request(subscriber_id: str, version: int, operation: str) -> Execution
         target=subscriber_id,
         expected_version=version,
     )
+
+
+def run_preflight() -> bool:
+    if not PREFLIGHT_SCRIPT.is_file():
+        print(f"BLOCK: runtime preflight script missing: {PREFLIGHT_SCRIPT}", file=sys.stderr)
+        return False
+    env = os.environ.copy()
+    env["MM7_SKIP_SECRET_PREFLIGHT"] = "0"
+    result = subprocess.run(
+        ["bash", str(PREFLIGHT_SCRIPT)],
+        cwd=PROJECT_ROOT,
+        env=env,
+        check=False,
+    )
+    if result.returncode != 0:
+        print("BLOCK: runtime preflight failed; no provisioning mutation permitted", file=sys.stderr)
+        return False
+    return True
 
 
 def make_core(mongodb_uri: str, idempotency_uri: str) -> tuple[MongoSubscriberRepository, Open5GSAdapter, AssuranceCore]:
@@ -62,6 +86,9 @@ def _catalog_match(current, expected) -> bool:
 
 
 def provision_execute(mongodb_uri: str, idempotency_uri: str, bootstrap_canonical: bool) -> int:
+    if not run_preflight():
+        return 2
+
     canonical, adapter, core = make_core(mongodb_uri, idempotency_uri)
     catalog = build_seven_subscriber_catalog()
     failures = 0
