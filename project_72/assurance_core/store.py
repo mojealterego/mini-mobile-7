@@ -8,7 +8,7 @@ from .models import Subscriber, SubscriberStatus
 
 
 class StoreConflictError(RuntimeError):
-    """Raised when expected_version does not match canonical state."""
+    """Raised when a canonical write conflicts with existing state."""
 
 
 class SubscriberNotFoundError(KeyError):
@@ -22,6 +22,11 @@ class SubscriberRepository(ABC):
 
     @abstractmethod
     def put(self, subscriber: Subscriber, *, expected_version: int) -> Subscriber:
+        raise NotImplementedError
+
+    @abstractmethod
+    def ensure_initial(self, subscriber: Subscriber) -> Subscriber:
+        """Atomically create an initial record or return an identical existing record."""
         raise NotImplementedError
 
 
@@ -50,6 +55,18 @@ class InMemorySubscriberRepository(SubscriberRepository):
                 )
             self._items[subscriber.subscriber_id] = subscriber
             return subscriber
+
+    def ensure_initial(self, subscriber: Subscriber) -> Subscriber:
+        with self._lock:
+            current = self._items.get(subscriber.subscriber_id)
+            if current is None:
+                self._items[subscriber.subscriber_id] = subscriber
+                return subscriber
+            if _same_canonical_record(current, subscriber):
+                return current
+            raise StoreConflictError(
+                f"canonical subscriber conflict during bootstrap: {subscriber.subscriber_id}"
+            )
 
 
 class MongoSubscriberRepository(SubscriberRepository):
@@ -85,6 +102,22 @@ class MongoSubscriberRepository(SubscriberRepository):
             ) from exc
         return subscriber
 
+    def ensure_initial(self, subscriber: Subscriber) -> Subscriber:
+        """Atomically create an initial record or accept an identical existing record."""
+        from pymongo.errors import DuplicateKeyError
+
+        document = subscriber.to_document()
+        try:
+            self._collection.insert_one(document)
+            return subscriber
+        except DuplicateKeyError as exc:
+            current = self.get(subscriber.subscriber_id)
+            if _same_canonical_record(current, subscriber):
+                return current
+            raise StoreConflictError(
+                f"canonical subscriber conflict during bootstrap: {subscriber.subscriber_id}"
+            ) from exc
+
     def put(self, subscriber: Subscriber, *, expected_version: int) -> Subscriber:
         from pymongo import ReturnDocument
 
@@ -103,6 +136,19 @@ class MongoSubscriberRepository(SubscriberRepository):
                 f"version conflict for {subscriber.subscriber_id}; expected {expected_version}"
             )
         return _from_document(result)
+
+
+def _same_canonical_record(left: Subscriber, right: Subscriber) -> bool:
+    return (
+        left.subscriber_id == right.subscriber_id
+        and left.imsi == right.imsi
+        and left.ue_ip == right.ue_ip
+        and left.version == right.version
+        and left.status is right.status
+        and left.secret_refs == right.secret_refs
+        and left.services == right.services
+        and left.msisdn == right.msisdn
+    )
 
 
 def _from_document(document: Mapping[str, Any]) -> Subscriber:
