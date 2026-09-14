@@ -12,7 +12,7 @@ Phase 2A/2B/2C implementation is being developed on `project-72/phase-2a` and is
 | Canonical Subscriber Store | IMPLEMENTED | Versioned canonical model plus MongoDB adapter and in-memory deterministic test adapter |
 | Capability Broker | IMPLEMENTED | Fail-closed policy/scope/risk gate |
 | Assurance Core | IMPLEMENTED | Authorization + policy + execution + authoritative readback + postcondition gate |
-| Golden Path ACTIVATE 7001 | TESTED IN CODE | Deterministic path reaches VERIFIED and retry is idempotent |
+| Golden Path ACTIVATE 7001 | TESTED IN CI | Deterministic path reaches VERIFIED and retry is idempotent |
 | Open5GS version drift | FIXED IN BRANCH | Bootstrap builds exact v2.8.0 source tag instead of floating PPA package |
 | Open5GS v2.8.0 subscriber schema | VERIFIED AGAINST PINNED TOOLING | Adapter follows the v2.8.0 `open5gs-dbctl` subscriber document layout |
 | Open5GS projection adapter | IMPLEMENTED | Canonical lifecycle state is projected with external secret resolution and optimistic concurrency |
@@ -21,11 +21,12 @@ Phase 2A/2B/2C implementation is being developed on `project-72/phase-2a` and is
 | Seven-subscriber catalog | IMPLEMENTED IN CODE | Deterministic 7001-7007 / 10.20.0.11-10.20.0.17 catalog with external secret refs |
 | Subscriber lifecycle | IMPLEMENTED IN CODE | PROVISIONED -> ACTIVE -> SUSPENDED -> RETIRED with optimistic concurrency |
 | Lifecycle postconditions | IMPLEMENTED IN CODE | ACTIVATE/SUSPEND/DEACTIVATE each require authoritative readback and state-specific postcondition |
-| Seven-subscriber lifecycle tests | TESTED IN CODE | Catalog, full 7001 lifecycle and wrong-version denial covered by deterministic tests |
-| CI validation | FIX IN PROGRESS | First CI run exposed an incorrect package export; export was corrected and requires a fresh CI run |
+| Seven-subscriber lifecycle tests | TESTED IN CI | Catalog, full 7001 lifecycle and wrong-version denial covered by deterministic tests |
+| CI validation | GREEN | Current branch head passed Project-72 test workflow |
+| Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
 | Ubuntu bootstrap | READY | Run on the actual Linux host |
 | Open5GS Core | READY | Requires actual Linux host and installation |
-| One subscriber projection | TESTED IN CODE | Canonical Store -> Open5GS adapter -> authoritative readback path covered by deterministic tests |
+| One subscriber projection | TESTED IN CI | Canonical Store -> Open5GS adapter -> authoritative readback path covered by deterministic tests |
 | Seven live subscriber projections | NEXT | Requires actual MongoDB/Open5GS runtime and external secrets |
 | UE Internet | READY | Requires actual host routing/NAT configuration |
 | IMS/Kamailio | SCAFFOLD | Requires stable Core/data plane |
@@ -53,11 +54,12 @@ Phase 2A/2B/2C implementation is being developed on `project-72/phase-2a` and is
 
 - Replaced the floating `ppa:open5gs/latest` installation path with a source build pinned to the official `v2.8.0` tag.
 - Kept MongoDB on the 8.0 package line.
-- Verified the pinned Open5GS v2.8.0 `open5gs-dbctl` layout: static IPv4 belongs under `slice[0].session[0].ue.ipv4`; subscriber status is represented by `subscriber_status` with values 0/1. citeturn2view0
+- Verified the pinned Open5GS v2.8.0 `open5gs-dbctl` layout: static IPv4 belongs under `slice[0].session[0].ue.ipv4`; subscriber status is represented by `subscriber_status` with values 0/1.
 - Added the Open5GS projection adapter under `adapters/open5gs/`.
 - Added a runtime `from_mongodb()` constructor; the MongoDB URI remains deployment-provided.
 - Activation advances canonical state using optimistic concurrency and projects the resulting ACTIVE version to Open5GS.
 - Authentication material is resolved only through an external `secret_ref` resolver; no supplied credentials are copied into Git.
+- Normalized `env://` secret references to shell-safe environment variable names without exposing values.
 - Added authoritative Open5GS readback with deterministic fingerprinting.
 - Added explicit `MISMATCH -> DRIFT` classification in Assurance Core.
 
@@ -72,14 +74,22 @@ Phase 2A/2B/2C implementation is being developed on `project-72/phase-2a` and is
 - Added deterministic seven-subscriber lifecycle tests.
 - Kept PSTN outbound disabled in the canonical catalog by default.
 
+### Runtime gate
+
+- Added `scripts/project-72-preflight.sh` and `make preflight`.
+- The gate blocks execution when Ubuntu 22.04, MongoDB, Open5GS, `ogstun`, UE routing, IPv4 forwarding, MongoDB reachability or required external authentication references are not ready.
+- Firewall INPUT policy is reported and a non-fail-closed default is surfaced as a warning requiring operator review.
+- Preflight never prints authentication secret values.
+- Runtime provisioning remains an explicit controlled-host action; the default `make provision-seven` path is dry-run.
+
 ### CI correction
 
-The first GitHub Actions execution reached the test command and exposed a real package error: `project_72/__init__.py` imported modules from the wrong package level. That file has now been corrected to export from `project_72.assurance_core`. The failing run is retained as evidence of the defect discovery; the corrected branch still requires a fresh CI execution before being marked green.
+The first GitHub Actions execution exposed a real package error: `project_72/__init__.py` imported modules from the wrong package level. That defect was corrected. The current branch head `2a3b480cb91e70f2bbe0827d196f8b4a4a25c5f5` subsequently passed the Project-72 test workflow.
 
 ## Validation note
 
-A live Open5GS deployment has not been claimed. CI validation is being used for deterministic source-level tests; runtime validation still requires the actual Ubuntu/Open5GS/MongoDB host and external authentication secrets.
+CI validates deterministic source-level behavior only. No live Open5GS deployment, UE attach, RAN session, IMS call or public telephony interconnect has been claimed.
 
 ## Important limitation
 
-The repository changes above are source-level implementation and deterministic tests. They do not claim that a live Open5GS core, RAN, IMS or public telephony interconnect is operational until the actual host and external dependencies have been tested.
+The repository changes above do not claim that a live Open5GS core, RAN, IMS or public telephony interconnect is operational until the actual controlled host and external dependencies have been tested.
