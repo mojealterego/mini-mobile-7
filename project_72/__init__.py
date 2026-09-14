@@ -1,35 +1,37 @@
-from .assurance_core.assurance import AssuranceCore
-from .assurance_core.broker import CapabilityBroker, CapabilityDeniedError, Policy
-from .assurance_core.models import (
+"""Project-72 assurance package."""
+
+from .assurance_core import (
+    AssuranceCore,
     AssuranceResult,
     AssuranceStatus,
     AuthoritativeReadback,
     Capability,
+    CapabilityBroker,
+    CapabilityDeniedError,
     ExecutionRequest,
-    Subscriber,
-    SubscriberStatus,
-)
-from .assurance_core.store import (
     InMemorySubscriberRepository,
     MongoSubscriberRepository,
+    Policy,
     StoreConflictError,
+    Subscriber,
     SubscriberNotFoundError,
+    SubscriberStatus,
 )
 
 __all__ = [
     "AssuranceCore",
-    "CapabilityBroker",
-    "CapabilityDeniedError",
-    "Policy",
     "AssuranceResult",
     "AssuranceStatus",
     "AuthoritativeReadback",
     "Capability",
+    "CapabilityBroker",
+    "CapabilityDeniedError",
     "ExecutionRequest",
-    "Subscriber",
-    "SubscriberStatus",
     "InMemorySubscriberRepository",
     "MongoSubscriberRepository",
+    "Policy",
     "StoreConflictError",
+    "Subscriber",
     "SubscriberNotFoundError",
+    "SubscriberStatus",
 ]
