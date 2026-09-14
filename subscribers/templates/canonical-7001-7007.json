@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "subscribers": [
+    {
+      "subscriber_id": "7001",
+      "imsi": "001010000000001",
+      "ue_ip": "10.20.0.11",
+      "version": 1,
+      "status": "PROVISIONED",
+      "secret_refs": {"authentication": "env://MINI_MOBILE_7/7001"},
+      "services": {"ims": true, "data": true, "pstn_outbound": false, "pstn_inbound": false}
+    },
+    {
+      "subscriber_id": "7002",
+      "imsi": "001010000000002",
+      "ue_ip": "10.20.0.12",
+      "version": 1,
+      "status": "PROVISIONED",
+      "secret_refs": {"authentication": "env://MINI_MOBILE_7/7002"},
+      "services": {"ims": true, "data": true, "pstn_outbound": false, "pstn_inbound": false}
+    },
+    {
+      "subscriber_id": "7003",
+      "imsi": "001010000000003",
+      "ue_ip": "10.20.0.13",
+      "version": 1,
+      "status": "PROVISIONED",
+      "secret_refs": {"authentication": "env://MINI_MOBILE_7/7003"},
+      "services": {"ims": true, "data": true, "pstn_outbound": false, "pstn_inbound": false}
+    },
+    {
+      "subscriber_id": "7004",
+      "imsi": "001010000000004",
+      "ue_ip": "10.20.0.14",
+      "version": 1,
+      "status": "PROVISIONED",
+      "secret_refs": {"authentication": "env://MINI_MOBILE_7/7004"},
+      "services": {"ims": true, "data": true, "pstn_outbound": false, "pstn_inbound": false}
+    },
+    {
+      "subscriber_id": "7005",
+      "imsi": "001010000000005",
+      "ue_ip": "10.20.0.15",
+      "version": 1,
+      "status": "PROVISIONED",
+      "secret_refs": {"authentication": "env://MINI_MOBILE_7/7005"},
+      "services": {"ims": true, "data": true, "pstn_outbound": false, "pstn_inbound": false}
+    },
+    {
+      "subscriber_id": "7006",
+      "imsi": "001010000000006",
+      "ue_ip": "10.20.0.16",
+      "version": 1,
+      "status": "PROVISIONED",
+      "secret_refs": {"authentication": "env://MINI_MOBILE_7/7006"},
+      "services": {"ims": true, "data": true, "pstn_outbound": false, "pstn_inbound": false}
+    },
+    {
+      "subscriber_id": "7007",
+      "imsi": "001010000000007",
+      "ue_ip": "10.20.0.17",
+      "version": 1,
+      "status": "PROVISIONED",
+      "secret_refs": {"authentication": "env://MINI_MOBILE_7/7007"},
+      "services": {"ims": true, "data": true, "pstn_outbound": false, "pstn_inbound": false}
+    }
+  ]
+}
