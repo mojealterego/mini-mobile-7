@@ -117,6 +117,28 @@ else
   block 'MongoDB is not reachable using MM7_MONGODB_URI'
 fi
 
+if [[ -n "${MM7_IDEMPOTENCY_DB_URI:-}" ]]; then
+  export MM7_IDEMPOTENCY_DB_URI
+  if python3 - <<'PY'
+import os
+import sys
+try:
+    from pymongo import MongoClient
+    client = MongoClient(os.environ["MM7_IDEMPOTENCY_DB_URI"], serverSelectionTimeoutMS=2000)
+    client.admin.command("ping")
+except Exception as exc:
+    print(f"Idempotency MongoDB ping failed: {exc}", file=sys.stderr)
+    raise SystemExit(1)
+PY
+  then
+    ok 'durable idempotency MongoDB reachable via MM7_IDEMPOTENCY_DB_URI'
+  else
+    block 'durable idempotency MongoDB is not reachable using MM7_IDEMPOTENCY_DB_URI'
+  fi
+else
+  block 'MM7_IDEMPOTENCY_DB_URI is required for runtime execution'
+fi
+
 if [[ "${MM7_SKIP_SECRET_PREFLIGHT:-0}" == '1' ]]; then
   warn 'secret preflight explicitly skipped by MM7_SKIP_SECRET_PREFLIGHT=1'
 else
