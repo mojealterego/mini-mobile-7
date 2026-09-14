@@ -9,13 +9,13 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | Capability Broker | IMPLEMENTED IN CODE | Fail-closed authorization, target/version/capability/risk checks |
 | Assurance Core | IMPLEMENTED IN CODE | Authorization -> execution -> authoritative readback -> postcondition -> VERIFIED |
 | Optimistic concurrency | IMPLEMENTED IN CODE | `expected_version` enforced atomically by canonical repository implementations |
-| Idempotency | IMPLEMENTED IN CODE | Stable idempotency key returns the prior assurance result; key reuse with a different request is CONFLICT |
+| Idempotency | IMPLEMENTED IN CODE | Process-local replay protection is active; durable MongoDB result storage is now available as an integration building block |
 | Drift detection | IMPLEMENTED IN CODE | Projection mismatch is classified as DRIFT; no automatic repair |
 | Open5GS v2.8.0 bootstrap | IMPLEMENTED | Exact source tag is built; floating `ppa:open5gs/latest` removed |
 | Subscriber lifecycle | IMPLEMENTED IN CODE | PROVISIONED -> ACTIVE -> SUSPENDED -> RETIRED with optimistic concurrency |
 | Lifecycle postconditions | IMPLEMENTED IN CODE | ACTIVATE/SUSPEND/DEACTIVATE each require authoritative readback and state-specific postcondition |
 | Seven-subscriber lifecycle tests | TESTED IN CI | Catalog, full 7001 lifecycle and wrong-version denial covered by deterministic tests |
-| CI validation | GREEN | Workflow #73 passed for commit `85e5a785f67a2ea2bd1de493b665ba89acb64941` |
+| CI validation | GREEN | Workflow #85 passed for commit `1f5f3fd69502d43fd78b823245d29c8faac2b968` |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
 | UERANSIM gNB template | AUDITED | PLMN/TAC/SST/AMF/gNB addressing aligned with lab contract |
 | Seven-UE renderer | IMPLEMENTED | Deployment-local UE configs for 7001-7007; external authentication references |
@@ -23,7 +23,7 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | UERANSIM attach | PENDING HOST | Requires actual UERANSIM/Open5GS runtime |
 | Seven live subscriber projections | NEXT | Requires actual MongoDB/Open5GS runtime and external secrets |
 | UE Internet | READY | Requires actual host routing/NAT configuration |
-| IMS/Kamailio | SCAFFOLD | Requires stable Core/data plane |
+| IMS/Kamailio | SCAFFOLD | Private-network ACL scaffold corrected; requires live Kamailio/Asterisk host validation |
 | Physical RAN | BLOCKED | Requires lawful RF authorization, suitable hardware and conformity/location checks |
 
 ## Phase 2D — UERANSIM boundary
@@ -36,18 +36,25 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 - Generated runtime files are excluded from Git through `runtime/` in `.gitignore`.
 - CI uses synthetic non-production authentication values only.
 
-## CI correction
-
-The renderer workflow previously failed because the script was invoked directly while its Git mode was `100644`; GitHub Actions therefore returned exit code 126. The workflow now invokes the renderer explicitly with `bash`.
-
-The corrected concurrency-enabled HEAD passed the complete assurance test job and the UERANSIM renderer validation in workflow #73.
-
 ## Gate 3B — optimistic concurrency
 
 - Added a deterministic two-writer race against `7001` with both writers using `expected_version=1`.
 - Exactly one writer must commit `v2 ACTIVE`.
 - The other writer must receive `StoreConflictError` and is classified as `CONFLICT` at the assurance layer.
 - The in-memory repository now protects the compare-and-write operation with a lock; the MongoDB implementation already uses an atomic `find_one_and_update` predicate on `subscriber_id + version`.
+
+## Idempotency durability boundary
+
+- The assurance layer currently prevents replay within one process using an in-memory idempotency cache.
+- Added `MongoIdempotencyStore` for durable storage of request fingerprints and completed assurance results.
+- The durable store is intentionally not described as a complete cross-process execution lock yet: reservation/lease semantics must be added before it becomes the authoritative multi-process execution gate.
+- This preserves the fail-closed requirement rather than falsely treating post-execution persistence as protection against concurrent duplicate execution.
+
+## IMS boundary correction
+
+- Corrected the Kamailio example ACL to use a deterministic private IMS source-address check instead of the previously unverified `ipops_check_ip` expression.
+- The example remains deployment scaffolding and requires validation with the installed Kamailio version before live activation.
+- Asterisk TLS/SRTP configuration remains a deployment template; no public SIP/PSTN trunk is configured.
 
 ## Validation note
 
