@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from threading import Lock
 from typing import Any, Mapping
 
 from .models import Subscriber, SubscriberStatus
@@ -27,25 +28,28 @@ class SubscriberRepository(ABC):
 class InMemorySubscriberRepository(SubscriberRepository):
     def __init__(self, initial: Mapping[str, Subscriber] | None = None) -> None:
         self._items: dict[str, Subscriber] = dict(initial or {})
+        self._lock = Lock()
 
     def get(self, subscriber_id: str) -> Subscriber:
-        try:
-            return self._items[subscriber_id]
-        except KeyError as exc:
-            raise SubscriberNotFoundError(subscriber_id) from exc
+        with self._lock:
+            try:
+                return self._items[subscriber_id]
+            except KeyError as exc:
+                raise SubscriberNotFoundError(subscriber_id) from exc
 
     def put(self, subscriber: Subscriber, *, expected_version: int) -> Subscriber:
-        current = self._items.get(subscriber.subscriber_id)
-        if current is None:
-            if expected_version != 0:
-                raise StoreConflictError("subscriber does not exist; expected_version must be 0")
-        elif current.version != expected_version:
-            raise StoreConflictError(
-                f"version conflict for {subscriber.subscriber_id}: "
-                f"expected {expected_version}, current {current.version}"
-            )
-        self._items[subscriber.subscriber_id] = subscriber
-        return subscriber
+        with self._lock:
+            current = self._items.get(subscriber.subscriber_id)
+            if current is None:
+                if expected_version != 0:
+                    raise StoreConflictError("subscriber does not exist; expected_version must be 0")
+            elif current.version != expected_version:
+                raise StoreConflictError(
+                    f"version conflict for {subscriber.subscriber_id}: "
+                    f"expected {expected_version}, current {current.version}"
+                )
+            self._items[subscriber.subscriber_id] = subscriber
+            return subscriber
 
 
 class MongoSubscriberRepository(SubscriberRepository):
