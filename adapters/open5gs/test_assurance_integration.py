@@ -5,6 +5,7 @@ import unittest
 from adapters.open5gs.adapter import Open5GSAdapter
 from project_72.assurance_core.assurance import AssuranceCore
 from project_72.assurance_core.broker import CapabilityBroker, Policy
+from project_72.assurance_core.catalog import build_seven_subscriber_catalog
 from project_72.assurance_core.models import AssuranceStatus, ExecutionRequest, Subscriber, SubscriberStatus
 from project_72.assurance_core.postconditions import activate_postcondition
 from project_72.assurance_core.store import InMemorySubscriberRepository
@@ -28,6 +29,25 @@ class FakeCollection:
         if not upsert:
             raise AssertionError("projection must use upsert")
         self.document = replacement
+
+
+class SevenSubscriberCollection:
+    def __init__(self) -> None:
+        self.documents: dict[str, dict[str, object]] = {}
+
+    def find_one(self, filter: dict[str, object]) -> dict[str, object] | None:
+        imsi = filter.get("imsi")
+        if not isinstance(imsi, str):
+            return None
+        return self.documents.get(imsi)
+
+    def replace_one(self, filter: dict[str, object], replacement: dict[str, object], *, upsert: bool) -> None:
+        if not upsert:
+            raise AssertionError("projection must use upsert")
+        imsi = filter.get("imsi")
+        if not isinstance(imsi, str):
+            raise AssertionError("projection filter must contain IMSI")
+        self.documents[imsi] = replacement
 
 
 def make_repository() -> InMemorySubscriberRepository:
@@ -79,6 +99,49 @@ class Open5GSAssuranceIntegrationTest(unittest.TestCase):
         self.assertEqual(result.observed_version, 2)
         self.assertEqual(repository.get("7001").status, SubscriberStatus.ACTIVE)
 
+    def test_all_seven_catalog_subscribers_project_and_readback_verified(self) -> None:
+        catalog = build_seven_subscriber_catalog()
+        repository = InMemorySubscriberRepository({
+            subscriber.subscriber_id: subscriber for subscriber in catalog
+        })
+        collection = SevenSubscriberCollection()
+        adapter = Open5GSAdapter(repository, collection, FakeSecrets())
+
+        for subscriber in catalog:
+            request_id = f"req-activate-{subscriber.subscriber_id}-open5gs-seven"
+            request = ExecutionRequest(
+                request_id=request_id,
+                idempotency_key=f"activate-{subscriber.subscriber_id}-open5gs-seven-v1",
+                capability_id=f"cap-{request_id}",
+                operation="ACTIVATE",
+                target=subscriber.subscriber_id,
+                expected_version=1,
+            )
+            result = AssuranceCore(
+                repository,
+                make_broker(),
+                adapter.execute,
+                adapter.readback,
+                activate_postcondition,
+            ).execute(principal="assurance-service", request=request)
+            self.assertEqual(result.status, AssuranceStatus.VERIFIED, subscriber.subscriber_id)
+            self.assertEqual(result.observed_version, 2, subscriber.subscriber_id)
+            self.assertEqual(repository.get(subscriber.subscriber_id).status, SubscriberStatus.ACTIVE)
+
+        self.assertEqual(len(collection.documents), 7)
+        for subscriber in catalog:
+            document = collection.documents[subscriber.imsi]
+            self.assertEqual(document["imsi"], subscriber.imsi)
+            marker = document["mm7_assurance"]
+            self.assertEqual(marker["subscriber_id"], subscriber.subscriber_id)
+            self.assertEqual(marker["canonical_version"], 2)
+            self.assertEqual(marker["status"], "ACTIVE")
+            slices = document["slice"]
+            self.assertIsInstance(slices, list)
+            sessions = slices[0]["session"]
+            internet = next(item for item in sessions if item["name"] == "internet")
+            self.assertEqual(internet["ue"]["ipv4"], subscriber.ue_ip)
+
     def test_modified_projection_is_drift_not_verified(self) -> None:
         projection_repository = make_repository()
         collection = FakeCollection()
@@ -94,8 +157,6 @@ class Open5GSAssuranceIntegrationTest(unittest.TestCase):
         assert isinstance(internet["ue"], dict)
         internet["ue"]["ipv4"] = "10.20.0.99"
 
-        # Keep canonical state at v1 while retaining the already-written v2
-        # Open5GS projection. This isolates projection drift from concurrency denial.
         canonical_repository = make_repository()
         readback_adapter = Open5GSAdapter(canonical_repository, collection, FakeSecrets())
         core = AssuranceCore(
