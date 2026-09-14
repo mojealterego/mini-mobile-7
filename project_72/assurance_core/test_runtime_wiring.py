@@ -5,11 +5,15 @@ from unittest import TestCase
 
 
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "project-72-provision-seven.py"
+PREFLIGHT = Path(__file__).resolve().parents[2] / "scripts" / "project-72-preflight.sh"
 
 
 class RuntimeProvisionerWiringTest(TestCase):
     def _source(self) -> str:
         return SCRIPT.read_text(encoding="utf-8")
+
+    def _preflight_source(self) -> str:
+        return PREFLIGHT.read_text(encoding="utf-8")
 
     def test_runtime_provisioner_uses_durable_store(self) -> None:
         source = self._source()
@@ -43,6 +47,13 @@ class RuntimeProvisionerWiringTest(TestCase):
         source = self._source()
         self.assertIn("adapter.readback(current.subscriber_id)", source)
         self.assertNotIn("adapter.readback(current)\n", source)
+
+    def test_preflight_validates_durable_idempotency_database(self) -> None:
+        source = self._preflight_source()
+        self.assertIn('MM7_IDEMPOTENCY_DB_URI', source)
+        self.assertIn('durable idempotency MongoDB reachable', source)
+        self.assertIn('durable idempotency MongoDB is not reachable', source)
+        self.assertIn("MM7_IDEMPOTENCY_DB_URI is required for runtime execution", source)
 
     def test_runtime_provisioner_has_no_secret_literals(self) -> None:
         source = self._source()
