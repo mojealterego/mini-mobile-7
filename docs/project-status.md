@@ -8,14 +8,14 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | Canonical Subscriber Store | IMPLEMENTED IN CODE | MongoDB + deterministic seven-subscriber catalog |
 | Capability Broker | IMPLEMENTED IN CODE | Fail-closed authorization, target/version/capability/risk checks |
 | Assurance Core | IMPLEMENTED IN CODE | Authorization -> execution -> authoritative readback -> postcondition -> VERIFIED |
-| Optimistic concurrency | IMPLEMENTED IN CODE | `expected_version` enforced by canonical repository |
-| Idempotency | IMPLEMENTED IN CODE | Stable idempotency key returns the prior assurance result |
+| Optimistic concurrency | IMPLEMENTED IN CODE | `expected_version` enforced atomically by canonical repository implementations |
+| Idempotency | IMPLEMENTED IN CODE | Stable idempotency key returns the prior assurance result; key reuse with a different request is CONFLICT |
 | Drift detection | IMPLEMENTED IN CODE | Projection mismatch is classified as DRIFT; no automatic repair |
 | Open5GS v2.8.0 bootstrap | IMPLEMENTED | Exact source tag is built; floating `ppa:open5gs/latest` removed |
 | Subscriber lifecycle | IMPLEMENTED IN CODE | PROVISIONED -> ACTIVE -> SUSPENDED -> RETIRED with optimistic concurrency |
 | Lifecycle postconditions | IMPLEMENTED IN CODE | ACTIVATE/SUSPEND/DEACTIVATE each require authoritative readback and state-specific postcondition |
 | Seven-subscriber lifecycle tests | TESTED IN CI | Catalog, full 7001 lifecycle and wrong-version denial covered by deterministic tests |
-| CI validation | PENDING CURRENT HEAD | Renderer CI fix committed; current workflow must complete |
+| CI validation | GREEN | Workflow #73 passed for commit `85e5a785f67a2ea2bd1de493b665ba89acb64941` |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
 | UERANSIM gNB template | AUDITED | PLMN/TAC/SST/AMF/gNB addressing aligned with lab contract |
 | Seven-UE renderer | IMPLEMENTED | Deployment-local UE configs for 7001-7007; external authentication references |
@@ -38,9 +38,16 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 
 ## CI correction
 
-The first renderer workflow failure was caused by the script being invoked directly while its Git mode was `100644`; GitHub Actions therefore returned exit code 126. The workflow now invokes the renderer explicitly with `bash`, removing the executable-bit dependency.
+The renderer workflow previously failed because the script was invoked directly while its Git mode was `100644`; GitHub Actions therefore returned exit code 126. The workflow now invokes the renderer explicitly with `bash`.
 
-The assurance/lifecycle suite itself passed before the renderer step failed. The corrected HEAD requires a fresh workflow run before this status can be marked GREEN.
+The corrected concurrency-enabled HEAD passed the complete assurance test job and the UERANSIM renderer validation in workflow #73.
+
+## Gate 3B — optimistic concurrency
+
+- Added a deterministic two-writer race against `7001` with both writers using `expected_version=1`.
+- Exactly one writer must commit `v2 ACTIVE`.
+- The other writer must receive `StoreConflictError` and is classified as `CONFLICT` at the assurance layer.
+- The in-memory repository now protects the compare-and-write operation with a lock; the MongoDB implementation already uses an atomic `find_one_and_update` predicate on `subscriber_id + version`.
 
 ## Validation note
 
