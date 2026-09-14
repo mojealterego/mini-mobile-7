@@ -5,7 +5,12 @@ from threading import RLock
 from typing import Callable
 
 from .broker import CapabilityBroker, CapabilityDeniedError
-from .idempotency import fingerprint_request
+from .idempotency import (
+    IdempotencyConflictError,
+    IdempotencyInProgressError,
+    IdempotencyStore,
+    fingerprint_request,
+)
 from .models import AssuranceResult, AssuranceStatus, AuthoritativeReadback, ExecutionRequest
 from .store import StoreConflictError, SubscriberRepository
 
@@ -21,6 +26,7 @@ class AssuranceCore:
     executor: Executor
     readback_provider: ReadbackProvider
     postcondition: Postcondition
+    idempotency_store: IdempotencyStore | None = None
     _results: dict[str, AssuranceResult] = field(default_factory=dict, init=False, repr=False)
     _request_fingerprints: dict[str, str] = field(default_factory=dict, init=False, repr=False)
     _lock: RLock = field(default_factory=RLock, init=False, repr=False)
@@ -45,6 +51,39 @@ class AssuranceCore:
             cached = self._results.get(request.idempotency_key)
             if cached is not None:
                 return cached
+
+            if self.idempotency_store is not None:
+                try:
+                    existing = self.idempotency_store.reserve(request.idempotency_key, fingerprint)
+                except IdempotencyConflictError as exc:
+                    return AssuranceResult(
+                        request.request_id,
+                        request.target,
+                        AssuranceStatus.CONFLICT,
+                        False,
+                        False,
+                        False,
+                        False,
+                        False,
+                        str(exc),
+                    )
+                if existing is not None:
+                    if existing.result is not None:
+                        self._request_fingerprints[request.idempotency_key] = fingerprint
+                        self._results[request.idempotency_key] = existing.result
+                        return existing.result
+                    return AssuranceResult(
+                        request.request_id,
+                        request.target,
+                        AssuranceStatus.CONFLICT,
+                        False,
+                        False,
+                        False,
+                        False,
+                        False,
+                        "idempotency key is already reserved by another execution",
+                    )
+
             self._request_fingerprints[request.idempotency_key] = fingerprint
 
             try:
@@ -177,4 +216,23 @@ class AssuranceCore:
 
     def _cache(self, request: ExecutionRequest, result: AssuranceResult) -> AssuranceResult:
         self._results[request.idempotency_key] = result
+        if self.idempotency_store is None:
+            return result
+
+        fingerprint = fingerprint_request(request)
+        try:
+            self.idempotency_store.put(request.idempotency_key, fingerprint, result)
+        except (IdempotencyConflictError, IdempotencyInProgressError) as exc:
+            return AssuranceResult(
+                request.request_id,
+                request.target,
+                AssuranceStatus.UNVERIFIED,
+                result.authorization,
+                result.policy,
+                result.execution,
+                result.readback,
+                False,
+                f"idempotency result persistence failed: {exc}",
+                result.observed_version,
+            )
         return result
