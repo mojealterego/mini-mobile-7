@@ -5,6 +5,7 @@ from threading import RLock
 from typing import Callable
 
 from .broker import CapabilityBroker, CapabilityDeniedError
+from .idempotency import fingerprint_request
 from .models import AssuranceResult, AssuranceStatus, AuthoritativeReadback, ExecutionRequest
 from .store import StoreConflictError, SubscriberRepository
 
@@ -21,13 +22,30 @@ class AssuranceCore:
     readback_provider: ReadbackProvider
     postcondition: Postcondition
     _results: dict[str, AssuranceResult] = field(default_factory=dict, init=False, repr=False)
+    _request_fingerprints: dict[str, str] = field(default_factory=dict, init=False, repr=False)
     _lock: RLock = field(default_factory=RLock, init=False, repr=False)
 
     def execute(self, *, principal: str, request: ExecutionRequest) -> AssuranceResult:
         with self._lock:
+            fingerprint = fingerprint_request(request)
+            previous = self._request_fingerprints.get(request.idempotency_key)
+            if previous is not None and previous != fingerprint:
+                return AssuranceResult(
+                    request.request_id,
+                    request.target,
+                    AssuranceStatus.CONFLICT,
+                    False,
+                    False,
+                    False,
+                    False,
+                    False,
+                    "idempotency key was already used for a different request",
+                )
+
             cached = self._results.get(request.idempotency_key)
             if cached is not None:
                 return cached
+            self._request_fingerprints[request.idempotency_key] = fingerprint
 
             try:
                 subscriber = self.repository.get(request.target)
