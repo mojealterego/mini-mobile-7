@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "request_id": "req-activate-7001-0001",
+  "idempotency_key": "activate-7001-v1",
+  "capability_id": "cap-activate-7001",
+  "operation": "ACTIVATE",
+  "target": "7001",
+  "expected_version": 1,
+  "parameters": {
+    "service": "IMS"
+  }
+}

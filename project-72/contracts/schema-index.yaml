@@ -1,0 +1,16 @@
+schema_version: "1.0.0"
+standard: JSON Schema Draft 2020-12
+schemas:
+  subscriber: project-72/contracts/schemas/subscriber.schema.json
+  capability: project-72/contracts/schemas/capability.schema.json
+  execution: project-72/contracts/schemas/execution.schema.json
+  readback: project-72/contracts/schemas/readback.schema.json
+  postcondition: project-72/contracts/schemas/postcondition.schema.json
+  assurance_result: project-72/contracts/schemas/assurance-result.schema.json
+statuses:
+  verified: VERIFIED
+  executed_only: EXECUTED
+  failed_assurance: UNVERIFIED
+  stale_projection: STALE
+  optimistic_lock_conflict: CONFLICT
+  detected_drift: DRIFT

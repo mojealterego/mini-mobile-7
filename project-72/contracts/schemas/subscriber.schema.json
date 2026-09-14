@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-mobile-7.local/project-72/schemas/subscriber.schema.json",
+  "title": "MINI-MOBILE-7 Canonical Subscriber",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["subscriber_id", "imsi", "ue_ip", "status", "version", "secret_refs", "services"],
+  "properties": {
+    "subscriber_id": {"type": "string", "pattern": "^700[1-7]$"},
+    "imsi": {"type": "string", "pattern": "^[0-9]{15}$"},
+    "msisdn": {"type": "string", "pattern": "^\\+[1-9][0-9]{6,14}$"},
+    "ue_ip": {"type": "string", "format": "ipv4"},
+    "status": {"type": "string", "enum": ["PROVISIONED", "ACTIVE", "SUSPENDED", "RETIRED"]},
+    "version": {"type": "integer", "minimum": 1},
+    "secret_refs": {"type": "object", "additionalProperties": false, "required": ["authentication"], "properties": {"authentication": {"type": "string", "minLength": 1}}},
+    "services": {"type": "object", "additionalProperties": false, "required": ["ims", "data"], "properties": {"ims": {"type": "boolean"}, "data": {"type": "boolean"}, "pstn_outbound": {"type": "boolean"}, "pstn_inbound": {"type": "boolean"}}}
+  }
+}

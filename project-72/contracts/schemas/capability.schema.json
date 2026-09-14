@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-mobile-7.local/project-72/schemas/capability.schema.json",
+  "title": "Project-72 Capability",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["capability_id", "principal", "operation", "resource", "decision", "policy_version", "risk"],
+  "properties": {
+    "capability_id": {"type": "string", "minLength": 8},
+    "principal": {"type": "string", "minLength": 1},
+    "operation": {"type": "string", "enum": ["READ", "PROVISION", "ACTIVATE", "SUSPEND", "DEACTIVATE", "ROUTE_CALL", "READBACK"]},
+    "resource": {"type": "string", "minLength": 1},
+    "decision": {"type": "string", "enum": ["ALLOW", "DENY"]},
+    "policy_version": {"type": "string", "minLength": 1},
+    "risk": {"type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"]},
+    "expires_at": {"type": "string", "format": "date-time"}
+  }
+}
