@@ -4,42 +4,59 @@ Private LTE/5G laboratory and private cellular network blueprint for up to 7 con
 
 ## Scope
 
-This repository contains configuration templates, deployment documentation, security guidance, and lab scaffolding for a small private mobile network.
+This repository contains configuration templates, deployment documentation, security guidance, lab scaffolding, and the Project-72 assurance boundary for a small private mobile network.
 
 Target stack:
 - Open5GS Core + MongoDB
 - UERANSIM for no-RF laboratory validation
 - Kamailio IMS for private voice/IMS experiments
+- Asterisk/PJSIP for controlled application voice and optional lawful SIP trunk integration
 - srsRAN or a compatible small-cell RAN for physical testing
 - Up to 7 controlled subscriber identities
 
 ## Network model
 
 ```text
-Internet
-   |
-Firewall / VPN
-   |
-Open5GS Core
-   |
-IMS (Kamailio)
-   |
-LTE / 5G RAN
-   |
-+--+--+--+--+--+
-7 controlled devices
+Internet / controlled SIP interconnect
+          |
+   Firewall / VPN / SBC
+          |
+      Open5GS Core
+          |
+       IMS layer
+    Kamailio / Asterisk
+          |
+      LTE / 5G RAN
+          |
+   +--+--+--+--+--+--+
+   7001 ...       7007
 ```
+
+Public telephony is not intrinsic to the private core. It is an explicitly controlled gateway capability and requires a lawful operator SIP trunk/interconnect and valid numbering arrangement.
 
 ## Addressing
 
 | Segment | CIDR | Purpose |
 |---|---|---|
-| Core | 10.10.0.0/24 | Core services | 
-| UE | 10.20.0.0/24 | Subscriber data plane | 
-| Management | 10.30.0.0/24 | Administration | 
-| IMS | 10.40.0.0/24 | SIP/IMS services | 
+| Core | 10.10.0.0/24 | Core services |
+| UE | 10.20.0.0/24 | Subscriber data plane |
+| Management | 10.30.0.0/24 | Administration |
+| IMS | 10.40.0.0/24 | SIP/IMS services |
 
 Internal test numbers are **7001–7007**. They are internal identifiers, not Polish public +48 mobile numbers.
+
+## Project-72 assurance boundary
+
+The canonical subscriber state is separated from Open5GS and IMS projections. Mutating operations require:
+
+1. explicit capability authorization;
+2. policy and risk approval;
+3. idempotent execution;
+4. optimistic concurrency using `expected_version`;
+5. authoritative readback;
+6. postcondition verification.
+
+Only the complete chain may produce `VERIFIED`. `EXECUTED` alone is never sufficient. The contracts live under `project-72/contracts/` and the first executable Golden Path is `ACTIVATE 7001` under `project_72/assurance_core/`.
 
 ## Lab-first rule
 
@@ -57,6 +74,8 @@ Do not transmit on cellular spectrum until the applicable Polish frequency alloc
 - Use host firewall/security groups and least-privilege service accounts.
 - Rotate any credential that has been exposed.
 - Store production secrets outside GitHub.
+- Use `secret_ref` references in canonical subscriber state rather than authentication material.
+- Do not use floating `latest` image/package references in a deployment baseline.
 
 ## Repository layout
 
@@ -68,30 +87,43 @@ ims/kamailio/           IMS configuration scaffolding
 subscribers/templates/ Subscriber templates without real secrets
 network/firewall/       Network security baseline
 monitoring/             Monitoring scaffolding
-docs/                   Architecture, deployment and legal notes
+project-72/contracts/   Machine-readable assurance contracts
+project_72/              Assurance Core implementation and tests
+docs/                   Architecture, deployment, legal and status notes
 ```
 
 ## Deployment stages
 
 1. Repository and security baseline
-2. Open5GS + MongoDB
-3. UERANSIM lab
-4. First subscriber and PDU session
-5. Lab Internet/NAT
-6. IMS/voice lab
-7. SMS lab where supported
-8. Seven subscribers
-9. Physical USIM preparation
-10. Physical RAN after legal gate
-11. First controlled handset
-12. Seven controlled handsets
-13. Monitoring, backups and operations
-14. Public telephony only through a lawful operator/MVNO/interconnect arrangement
+2. Deterministic Open5GS + MongoDB
+3. Project-72 assurance boundary
+4. UERANSIM lab
+5. First canonical subscriber
+6. Canonical → Open5GS projection and authoritative readback
+7. Lab Internet/NAT
+8. IMS/voice lab
+9. SMS lab where supported
+10. Seven subscribers
+11. Controlled SIP gateway, only after lawful interconnect is available
+12. Physical USIM preparation
+13. Physical RAN after legal gate
+14. First controlled handset
+15. Seven controlled handsets
+16. Monitoring, backups and operations
+
+## Local verification
+
+```bash
+make validate
+make assurance-test
+```
+
+The assurance test is deterministic and does not require a live cellular core.
 
 ## Acceptance criteria
 
-The project is complete only when each applicable stage has been tested and documented, secrets remain external, and physical RF deployment has passed the legal and hardware gates.
+The project is complete only when each applicable stage has been tested and documented, secrets remain external, canonical state and projections have authoritative readback, and physical RF deployment has passed the legal and hardware gates.
 
 ## Important limitation
 
-This repository can be prepared remotely, including from an Android device, but a real cellular network cannot be truthfully marked as deployed until a suitable Linux host, RAN hardware, USIMs and lawful radio authorization are actually available.
+Repository implementation can be completed remotely, but a real cellular network cannot be truthfully marked as deployed until a suitable Linux host, RAN hardware, compatible USIMs, and lawful radio authorization are actually available.
