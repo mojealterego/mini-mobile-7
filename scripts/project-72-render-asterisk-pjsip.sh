@@ -43,8 +43,8 @@ for id in 7001 7002 7003 7004 7005 7006 7007; do
         echo "missing required secret environment variable: $var" >&2
         exit 1
     fi
-    if [[ "$password" == *$'\n'* || "$password" == *$'\r'* ]]; then
-        echo "invalid newline in $var" >&2
+    if [[ ! "$password" =~ ^[A-Za-z0-9._~:@%+/,=-]+$ ]]; then
+        echo "invalid characters in $var" >&2
         exit 1
     fi
     cat >>"$TMP" <<EOF
