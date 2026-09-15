@@ -10,29 +10,25 @@ Target stack:
 - Open5GS Core + MongoDB
 - UERANSIM for no-RF laboratory validation
 - Kamailio IMS for private voice/IMS experiments
-- Asterisk/PJSIP for controlled application voice and optional lawful SIP trunk integration
-- srsRAN or a compatible small-cell RAN for physical testing
+- Asterisk/PJSIP for controlled application voice
+- srsRAN or compatible small-cell RAN for physical testing
 - Up to 7 controlled subscriber identities
 
 ## Network model
 
 ```text
-Internet / controlled SIP interconnect
-          |
-   Firewall / VPN / SBC
-          |
-      Open5GS Core
-          |
-       IMS layer
-    Kamailio / Asterisk
-          |
-      LTE / 5G RAN
-          |
-   +--+--+--+--+--+--+
-   7001 ...       7007
+Firewall / VPN
+      |
+ Open5GS Core
+      |
+ IMS: Kamailio / Asterisk
+      |
+ LTE / 5G RAN
+      |
+ 7001 ... 7007
 ```
 
-Public telephony is not intrinsic to the private core. It is an explicitly controlled gateway capability and requires a lawful operator SIP trunk/interconnect and valid numbering arrangement.
+Public telephony is not intrinsic to the private core. Any gateway capability requires an explicitly authorized lawful interconnect and valid numbering arrangement.
 
 ## Addressing
 
@@ -43,39 +39,60 @@ Public telephony is not intrinsic to the private core. It is an explicitly contr
 | Management | 10.30.0.0/24 | Administration |
 | IMS | 10.40.0.0/24 | SIP/IMS services |
 
-Internal test numbers are **7001–7007**. They are internal identifiers, not Polish public +48 mobile numbers.
+Internal test numbers are **7001–7007**, not public Polish mobile numbers.
 
 ## Project-72 assurance boundary
 
-The canonical subscriber state is separated from Open5GS and IMS projections. Mutating operations require:
+Mutating operations require:
 
 1. explicit capability authorization;
-2. policy and risk approval;
+2. policy/risk approval;
 3. idempotent execution;
 4. optimistic concurrency using `expected_version`;
 5. authoritative readback;
 6. postcondition verification.
 
-Only the complete chain may produce `VERIFIED`. `EXECUTED` alone is never sufficient. The contracts live under `project-72/contracts/` and the first executable Golden Path is `ACTIVATE 7001` under `project_72/assurance_core/`.
+Only the complete chain can produce `VERIFIED`. `EXECUTED` alone is never sufficient. The contracts live under `project-72/contracts/` and the implementation under `project_72/`.
+
+## Operations
+
+```bash
+make assurance-test
+make ims-config-check
+make security-check
+make metrics-test
+make preflight
+make provision-seven
+make host-evidence
+```
+
+`security-check` is a static source/configuration gate. `host-evidence` is read-only and captures deployment evidence. Neither substitutes for live host acceptance.
+
+## Monitoring
+
+`monitoring/project_72_metrics.py` renders bounded Prometheus text from an already collected JSON evidence snapshot. It is read-only and does not become a subscriber authority. Sensitive identifiers and authentication material must not be metric labels.
+
+## Backup and recovery
+
+Use `scripts/project-72-backup.sh` with protected runtime MongoDB URIs. It backs up canonical, durable idempotency and optional eSIM metadata domains independently, generates checksums and excludes raw secrets/private keys. Restore first into an isolated MongoDB target; follow `docs/backup-recovery.md` before considering production recovery.
 
 ## Lab-first rule
 
-The software stack is developed and tested in a no-RF lab first. UERANSIM does not turn an Android phone into a cellular UE; real phones require physical RAN hardware, compatible USIMs, lawful spectrum use, and appropriate radio authorization.
+The software stack is developed and tested in a no-RF lab first. UERANSIM does not turn an Android phone into a cellular UE; real phones require physical RAN hardware, compatible USIMs, lawful spectrum use and appropriate radio authorization.
 
 ## Legal gate
 
-Do not transmit on cellular spectrum until the applicable Polish frequency allocation, permit, equipment conformity, location, power, antenna, and other regulatory requirements have been verified with UKE. Do not self-assign public numbering or create unauthorized interconnection to public mobile networks.
+Do not transmit on cellular spectrum until applicable Polish frequency allocation, permit, equipment conformity, location, power, antenna and other regulatory requirements have been verified with UKE. Do not self-assign public numbering or create unauthorized interconnection to public mobile networks.
 
 ## Security baseline
 
-- Never commit Ki, OPc, SQN secrets, API keys, passwords, private keys, or VPN credentials.
+- Never commit Ki, OPc, SQN secrets, API keys, passwords, private keys or VPN credentials.
 - Keep MongoDB and management interfaces off the public Internet.
 - Prefer VPN-only administration.
 - Use host firewall/security groups and least-privilege service accounts.
-- Rotate any credential that has been exposed.
 - Store production secrets outside GitHub.
-- Use `secret_ref` references in canonical subscriber state rather than authentication material.
-- Do not use floating `latest` image/package references in a deployment baseline.
+- Use `secret_ref` references in canonical subscriber state.
+- Do not use floating `latest` image/package references in deployment baselines.
 
 ## Repository layout
 
@@ -84,55 +101,17 @@ core/open5gs/          Core configuration templates
 ran/lte/                LTE RAN templates
 ran/5g/                 5G RAN templates
 ims/kamailio/           IMS configuration scaffolding
+ims/asterisk/           Asterisk/PJSIP boundary template
 subscribers/templates/ Subscriber templates without real secrets
 network/firewall/       Network security baseline
-monitoring/             Monitoring scaffolding
+monitoring/             Monitoring and bounded metrics exporter
 project-72/contracts/   Machine-readable assurance contracts
 project_72/             Assurance Core implementation and tests
-docs/                   Architecture, deployment, legal and status notes
+docs/                   Architecture, deployment, recovery, legal and status notes
 ```
 
-## Deployment stages
+## Validation status
 
-1. Repository and security baseline
-2. Deterministic Open5GS + MongoDB
-3. Project-72 assurance boundary
-4. UERANSIM lab
-5. First canonical subscriber
-6. Canonical → Open5GS projection and authoritative readback
-7. Lab Internet/NAT
-8. IMS/voice lab
-9. SMS lab where supported
-10. Seven subscribers
-11. Controlled SIP gateway, only after lawful interconnect is available
-12. Physical USIM preparation
-13. Physical RAN after legal gate
-14. First controlled handset
-15. Seven controlled handsets
-16. Monitoring, backups and operations
+The latest confirmed CI run before this operations batch was successful and covered 63 assurance tests, IMS static safety, UERANSIM rendering and Asterisk rendering. The newly added security, telemetry and backup/recovery controls require the subsequent CI run for confirmation.
 
-## Local verification
-
-```bash
-make validate
-make assurance-test
-make ims-config-check
-```
-
-`make ims-config-check` is a static safety gate. It does not prove live SIP registration, TLS certificate validation, SRTP negotiation or calls.
-
-## Project-72 implementation log
-
-Substantive Project-72 implementation work is recorded in `docs/project-72-session-log-2026-09-15.md` and `docs/project-status.md`. The current codebase includes the canonical subscriber store, fail-closed Capability Broker, Assurance Core, optimistic concurrency, durable idempotency, Open5GS v2.8.0 projection/readback, hardened drift detection, seven-UE UERANSIM rendering, runtime preflight/dry-run boundaries, host evidence collection, private identity generation and a controlled eSIM activation-artifact boundary.
-
-The private IMS boundary now includes explicit Kamailio REGISTER routing, a deployment-time seven-subscriber Asterisk/PJSIP renderer and a static IMS safety gate covering private binds, TLS/SRTP requirements, external credentials and absence of an active public-telephony route.
-
-The eSIM boundary includes metadata-only artifact persistence and fail-closed interrupted-write reconciliation. A matching persisted artifact may advance canonical state only when all authority/version/profile/reference invariants match; mismatched artifacts are rejected. `GENERATED`, `INSTALLED` and `VERIFIED` remain distinct states.
-
-The latest external IMS reference audit covers `mojealterego/pjproject-archive`, `mojealterego/Pixel-turn-on-5G-Volte-and-automatically-register-with-IMS` and `selvakn/gsm-sip-bridge`. The audit is documented in `docs/ims-external-reference-2026-09-15.md`. These repositories are used selectively as reference material; they do not replace Project-72 authorization, canonical state, Open5GS version pinning, or authoritative readback.
-
-Latest previously confirmed Project-72 CI: workflow #284 completed successfully for commit `1802d86237d2e3a8c4b99e03ab3e3a7e0e6cddfe`. Later commits hardened drift detection and eSIM reconciliation and therefore require a new CI result before the current HEAD is marked `PASS-CI`.
-
-### Current limitations
-
-CI and source-level tests do not prove a live telecom deployment. Still pending are the new CI validation, actual MongoDB/Open5GS host acceptance, seven live UERANSIM attaches and PDU sessions, UE Internet validation, live Kamailio/Asterisk TLS/SRTP registration and internal calls, operational drift/security evidence, real SM-DP+ eSIM provisioning and device readback, and physical RAN/handset validation.
+CI/source tests do not prove live Open5GS deployment, UERANSIM attachment, UE Internet, IMS TLS/SRTP calls, eSIM installation, physical RAN operation or lawful spectrum use.
