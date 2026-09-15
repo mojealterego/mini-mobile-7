@@ -14,7 +14,12 @@ from project_72.assurance_core.store import InMemorySubscriberRepository
 
 
 class Resolver:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.last_ref = ""
+
     def resolve(self, secret_ref: str) -> dict[str, str]:
+        self.calls += 1
         self.last_ref = secret_ref
         return {"matching_id": "opaque-test-matching-id"}
 
@@ -24,10 +29,11 @@ class EsimAssuranceTests(unittest.TestCase):
         subscribers = build_seven_subscriber_catalog()
         self.repository = InMemorySubscriberRepository({s.subscriber_id: s for s in subscribers})
         self.artifacts = InMemoryEsimArtifactRepository()
+        self.resolver = Resolver()
         self.adapter = EsimProvisioningAdapter(
             self.repository,
             self.artifacts,
-            Resolver(),
+            self.resolver,
             smdp_address="smdp.example.invalid",
         )
         self.broker = CapabilityBroker(
@@ -70,6 +76,17 @@ class EsimAssuranceTests(unittest.TestCase):
         stored = self.artifacts.get("7001")
         self.assertEqual(stored.version, 2)
         self.assertEqual(stored.status, "GENERATED")
+        self.assertNotIn("opaque-test-matching-id", stored.__repr__())
+        self.assertNotIn("LPA:1$", stored.__repr__())
+
+    def test_same_idempotency_key_replays_without_second_side_effect(self) -> None:
+        core = self._core()
+        first = core.execute(principal="project-72-operator", request=self._request())
+        second = core.execute(principal="project-72-operator", request=self._request())
+        self.assertEqual(first.status, AssuranceStatus.VERIFIED)
+        self.assertEqual(second, first)
+        self.assertEqual(self.resolver.calls, 1)
+        self.assertEqual(self.repository.get("7001").version, 2)
 
     def test_rejects_stale_expected_version_before_execution(self) -> None:
         result = self._core().execute(
