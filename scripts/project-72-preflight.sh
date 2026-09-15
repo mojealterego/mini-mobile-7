@@ -25,16 +25,20 @@ for cmd in ip systemctl sysctl iptables python3; do
   if command -v "$cmd" >/dev/null 2>&1; then ok "command $cmd"; else block "missing command: $cmd"; fi
 done
 
-if command -v mongod >/dev/null 2>&1 || systemctl list-unit-files mongod.service >/dev/null 2>&1; then
+if command -v mongod >/dev/null 2>&1 || (command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files mongod.service >/dev/null 2>&1); then
   ok 'MongoDB installation detected'
 else
   block 'MongoDB (mongod) not detected'
 fi
 
-if systemctl is-active --quiet mongod; then
-  ok 'mongod active'
+if command -v systemctl >/dev/null 2>&1; then
+  if systemctl is-active --quiet mongod; then
+    ok 'mongod active'
+  else
+    block 'mongod is not active'
+  fi
 else
-  block 'mongod is not active'
+  block 'mongod active-state cannot be verified without systemctl'
 fi
 
 if command -v open5gs-amfd >/dev/null 2>&1 && [[ -d /etc/open5gs ]]; then
@@ -43,7 +47,7 @@ else
   block 'Open5GS AMF binary or /etc/open5gs missing'
 fi
 
-if systemctl list-unit-files 'open5gs-*.service' --no-legend 2>/dev/null | grep -q 'open5gs-'; then
+if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files 'open5gs-*.service' --no-legend 2>/dev/null | grep -q 'open5gs-'; then
   ok 'Open5GS systemd units detected'
 else
   block 'no Open5GS systemd units detected'
@@ -64,7 +68,7 @@ fi
 if sysctl -n net.ipv4.ip_forward 2>/dev/null | grep -qx '1'; then
   ok 'IPv4 forwarding enabled'
 else
-  block 'IPv4 forwarding is disabled'
+  block 'IPv4 forwarding is disabled or unavailable'
 fi
 
 if ip route show 10.20.0.0/24 2>/dev/null | grep -q 'dev ogstun'; then
