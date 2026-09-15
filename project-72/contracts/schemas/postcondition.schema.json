@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-mobile-7.local/project-72/schemas/postcondition.schema.json",
+  "title": "Project-72 Postcondition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["assertion_id", "target", "assertions"],
+  "properties": {
+    "assertion_id": {"type": "string", "minLength": 8},
+    "target": {"type": "string", "pattern": "^700[1-7]$"},
+    "assertions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "operator", "expected"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "operator": {"type": "string", "enum": ["EQUALS", "NOT_EQUALS", "CONTAINS", "IN_RANGE", "EXISTS"]},
+          "expected": {}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-mobile-7.local/project-72/schemas/readback.schema.json",
+  "title": "Project-72 Authoritative Readback",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "source", "target", "observed_version", "state", "observed_at", "fingerprint"],
+  "properties": {
+    "request_id": {"type": "string", "minLength": 8},
+    "source": {"type": "string", "enum": ["CANONICAL_STORE", "OPEN5GS", "IMS", "RAN"]},
+    "target": {"type": "string", "pattern": "^700[1-7]$"},
+    "observed_version": {"type": "integer", "minimum": 1},
+    "state": {"type": "string", "enum": ["PROVISIONED", "ACTIVE", "SUSPENDED", "RETIRED", "ABSENT", "ERROR"]},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "fingerprint": {"type": "string", "minLength": 16},
+    "details": {"type": "object"}
+  }
+}

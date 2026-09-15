@@ -1,0 +1,5 @@
+# MINI-MOBILE-7 private IMS dispatcher set
+# Set 1 contains only controlled internal service endpoints.
+# No public SIP/PSTN destination is permitted.
+
+1 sip:10.40.0.20:5061;transport=tls 0 0 0 "Asterisk private IMS endpoint"
