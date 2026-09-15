@@ -15,17 +15,18 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | Subscriber lifecycle | IMPLEMENTED IN CODE | PROVISIONED -> ACTIVE -> SUSPENDED -> RETIRED with optimistic concurrency |
 | Lifecycle postconditions | IMPLEMENTED IN CODE | ACTIVATE/SUSPEND/DEACTIVATE each require authoritative readback and state-specific postcondition |
 | Seven-subscriber lifecycle tests | TESTED IN CI | Catalog, lifecycle and wrong-version denial covered by deterministic tests |
-| CI validation | PENDING FRESH RUN | New renderer suite and corrected concurrent-race test require fresh CI completion |
+| CI validation | PENDING FRESH RUN | Renderer/runtime-wiring hardening committed; newest workflow must complete |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
 | Runtime provisioner | IMPLEMENTED IN CODE | `--execute` requires durable MongoDB idempotency URI and injects `MongoIdempotencyStore` into AssuranceCore |
+| Runtime dry-run boundary | IMPLEMENTED IN CODE | Dry-run exits before runtime database construction or mutation path |
 | UERANSIM gNB template | AUDITED | PLMN/TAC/SST/AMF/gNB addressing aligned with lab contract |
 | Seven-UE renderer | IMPLEMENTED | Deployment-local UE configs for 7001-7007; external authentication references |
 | Seven-UE renderer test suite | IMPLEMENTED IN CODE | Seven-way mapping, 0600 permissions, missing/malformed secret rejection and source secret-literal guard |
-| Seven-UE renderer CI validation | IMPLEMENTED | Dedicated unittest suite plus shell-level rendering checks with synthetic credentials |
 | UERANSIM attach | PENDING HOST | Requires actual UERANSIM/Open5GS runtime |
 | Seven live subscriber projections | NEXT | Requires actual MongoDB/Open5GS runtime and external secrets |
 | UE Internet | READY | Requires actual host routing/NAT configuration |
 | IMS/Kamailio | SCAFFOLD | Private-network ACL scaffold corrected; requires live Kamailio/Asterisk host validation |
+| Host evidence collector | IMPLEMENTED | Read-only service/network/config evidence capture for Gate 4E/5/7 |
 | Physical RAN | BLOCKED | Requires lawful RF authorization, suitable hardware and conformity/location checks |
 
 ## Phase 2D — UERANSIM boundary
@@ -37,7 +38,7 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 - Authentication material is not supplied to the renderer as command-line arguments.
 - Generated runtime files are excluded from Git through `runtime/` in `.gitignore`.
 - CI uses synthetic non-production authentication values only.
-- Dedicated renderer tests now verify all seven identity mappings, `0600` output permissions, missing-secret fail-closed behavior and malformed authentication-material rejection.
+- Dedicated renderer tests verify all seven identity mappings, `0600` output permissions, missing-secret fail-closed behavior and malformed authentication-material rejection.
 
 ## Gate 3B — optimistic concurrency
 
@@ -56,6 +57,19 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 - A reservation without a terminal result fails closed as `CONFLICT`; there is deliberately no automatic lease takeover because taking over after an unknown crash could duplicate a non-idempotent telecom side effect.
 - Runtime `--execute` now requires the durable MongoDB idempotency URI and injects the durable store into AssuranceCore.
 - Added a deterministic concurrent race test proving that a second caller cannot execute the same telecom side effect while another caller owns the reservation.
+
+## Gate 4D — runtime wiring and seven-way projection
+
+- Runtime preflight receives the same canonical MongoDB URI and durable idempotency URI used by execution.
+- Runtime `--execute` refuses to proceed without durable idempotency storage.
+- Dry-run remains dependency-free from the mutation path and must not construct runtime MongoDB/Open5GS adapters.
+- Open5GS adapter/integration coverage exercises all seven catalog subscribers through projection and authoritative readback.
+
+## Gate 4E — host acceptance boundary
+
+- Added a read-only host evidence collector for Ubuntu/service/network/firewall/socket state and deployment-local UERANSIM file hashes.
+- The collector intentionally does not mutate services, subscribers or Open5GS state and is designed to capture evidence before/after live acceptance.
+- Actual UERANSIM attach, PDU-session establishment and seven-subscriber live readback remain pending on the deployment host.
 
 ## IMS boundary correction
 
