@@ -48,8 +48,13 @@ class CapabilityBroker:
             raise CapabilityDeniedError("capability_id does not bind to request_id")
         if request.operation == "ROUTE_CALL" and not subscriber.services.get("pstn_outbound", False):
             raise CapabilityDeniedError("PSTN outbound capability is not enabled")
+        if request.operation in {"ESIM_GENERATE", "ESIM_ACTIVATE"}:
+            if not subscriber.secret_refs.get("esim_activation"):
+                raise CapabilityDeniedError("eSIM provisioning secret_ref is not configured")
+            if not subscriber.profile_id:
+                raise CapabilityDeniedError("eSIM profile_id is not configured")
 
-        risk = "MEDIUM" if request.operation in {"ACTIVATE", "SUSPEND", "ROUTE_CALL"} else "LOW"
+        risk = "MEDIUM" if request.operation in {"ACTIVATE", "SUSPEND", "ROUTE_CALL", "ESIM_ACTIVATE"} else "LOW"
         if risk not in self._risk_rank or policy.max_risk not in self._risk_rank:
             raise CapabilityDeniedError("unknown risk classification")
         if self._risk_rank[risk] > self._risk_rank[policy.max_risk]:
