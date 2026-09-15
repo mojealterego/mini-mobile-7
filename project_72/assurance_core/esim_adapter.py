@@ -5,8 +5,8 @@ from dataclasses import replace
 from typing import Any, Mapping
 
 from .esim import EsimArtifactGenerator, EsimProfileMetadata, EsimSecretResolver, EsimStatus
-from .esim_repository import EsimArtifactConflictError, EsimArtifactRepository, StoredEsimArtifact
-from .models import AuthoritativeReadback, ExecutionRequest, Subscriber, SubscriberStatus
+from .esim_repository import EsimArtifactRepository, StoredEsimArtifact
+from .models import AuthoritativeReadback, ExecutionRequest
 from .store import StoreConflictError, SubscriberRepository
 
 
@@ -59,6 +59,7 @@ class EsimProvisioningAdapter:
             self._resolver,
         )
         next_version = subscriber.version + 1
+        artifact_expected_version = 0 if subscriber.esim_status is EsimStatus.PLANNED else subscriber.version
         stored = StoredEsimArtifact(
             subscriber_id=artifact.subscriber_id,
             profile_id=artifact.profile_id,
@@ -68,7 +69,7 @@ class EsimProvisioningAdapter:
             status=artifact.status.value,
             version=next_version,
         )
-        self._artifacts.put(stored, expected_version=0 if subscriber.esim_status is EsimStatus.PLANNED else subscriber.version)
+        self._artifacts.put(stored, expected_version=artifact_expected_version)
 
         updated = replace(subscriber, version=next_version, esim_status=EsimStatus.GENERATED)
         self._repository.put(updated, expected_version=request.expected_version)
@@ -92,6 +93,7 @@ class EsimProvisioningAdapter:
             state="GENERATED" if consistent else "MISMATCH",
             fingerprint=fingerprint,
             details={
+                "subscriber_id": subscriber_id,
                 "profile_id": artifact.profile_id,
                 "smdp_address": artifact.smdp_address,
                 "activation_code_ref": artifact.activation_code_ref,
