@@ -34,7 +34,7 @@ class AsteriskRendererTests(unittest.TestCase):
             content = output.read_text(encoding="utf-8")
             for subscriber_id in range(7001, 7008):
                 self.assertIn(f"username={subscriber_id}", content)
-                self.assertIn(f"[${subscriber_id}]" if False else f"[{subscriber_id}]", content)
+                self.assertIn(f"[{subscriber_id}]", content)
             self.assertIn("protocol=tls", content)
             self.assertIn("bind=10.40.0.20:5061", content)
 
@@ -53,9 +53,9 @@ class AsteriskRendererTests(unittest.TestCase):
             self.assertFalse(output.exists())
             self.assertIn("missing required secret environment variable", result.stderr)
 
-    def test_newline_in_password_fails_closed(self) -> None:
+    def test_unsafe_password_characters_fail_closed(self) -> None:
         env = self._env()
-        env["MM7_SIP_PASSWORD_7001"] = "bad\npassword"
+        env["MM7_SIP_PASSWORD_7001"] = "unsafe;password"
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "pjsip.conf"
             result = subprocess.run(
