@@ -10,7 +10,7 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | Assurance Core | IMPLEMENTED IN CODE | Authorization -> execution -> authoritative readback -> postcondition -> VERIFIED |
 | Optimistic concurrency | IMPLEMENTED IN CODE | `expected_version` enforced atomically by canonical repository implementations |
 | Idempotency | IMPLEMENTED IN CODE | Durable MongoDB reservation + terminal-result persistence; concurrent duplicate execution fails closed |
-| Drift detection | IMPLEMENTED IN CODE | Projection mismatch is classified as DRIFT; no automatic repair |
+| Drift detection | IMPLEMENTED IN CODE | Target, lifecycle, version, IMSI, UE IP, assurance marker and service projection mismatches classify as DRIFT; malformed/missing authoritative fields fail closed; no automatic repair |
 | Open5GS v2.8.0 bootstrap | IMPLEMENTED | Exact source tag is built; floating `ppa:open5gs/latest` removed |
 | Subscriber lifecycle | IMPLEMENTED IN CODE | PROVISIONED -> ACTIVE -> SUSPENDED -> RETIRED with optimistic concurrency |
 | Lifecycle postconditions | IMPLEMENTED IN CODE | ACTIVATE/SUSPEND/DEACTIVATE each require authoritative readback and state-specific postcondition |
@@ -18,11 +18,12 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | Identity generator | IMPLEMENTED IN CODE | Deterministic private identity records for 7001–7007 |
 | eSIM artifact generation | IMPLEMENTED IN CODE | External matching ID reference -> LPA artifact; no raw activation secret persisted |
 | eSIM AssuranceCore path | TESTED IN CI | `ESIM_GENERATE` authorization, execution, readback and postcondition chain |
+| eSIM interrupted-write reconciliation | IMPLEMENTED IN CODE | Matching artifact left by an interrupted canonical commit can be safely promoted; mismatched artifact fails closed |
 | Asterisk PJSIP renderer | IMPLEMENTED IN CODE | Seven private endpoints rendered from external secrets; 0600 runtime file and injection checks |
 | Kamailio REGISTER routing | IMPLEMENTED IN CONFIG | Private REGISTER traffic routed to controlled Asterisk registrar; live validation pending |
 | IMS static safety gate | TESTED IN CI | Private bind, TLS/SRTP baseline, external credentials and no public telephony route checked in CI |
 | IMS external reference audit | COMPLETE | PJSIP archive, Pixel IMS module and GSM-SIP bridge audited; decisions recorded in `docs/ims-external-reference-2026-09-15.md` |
-| CI validation | PASS-CI | Workflow #284 passed for commit `1802d86237d2e3a8c4b99e03ab3e3a7e0e6cddfe`; 53 assurance tests + IMS gate + UERANSIM/Asterisk renderer checks |
+| CI validation | PASS-CI (last confirmed) | Workflow #284 passed for commit `1802d86237d2e3a8c4b99e03ab3e3a7e0e6cddfe`; later code commits require a new CI run |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
 | Runtime provisioner | IMPLEMENTED IN CODE | `--execute` requires durable MongoDB idempotency URI and injects `MongoIdempotencyStore` into AssuranceCore |
 | Runtime dry-run boundary | IMPLEMENTED IN CODE | Dry-run exits before runtime database construction or mutation path |
@@ -41,6 +42,14 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 - Added a read-only host evidence collector for Ubuntu/service/network/firewall/socket state and deployment-local UERANSIM file hashes.
 - The collector intentionally does not mutate services, subscribers or Open5GS state and is designed to capture evidence before/after live acceptance.
 - Actual UERANSIM attach, PDU-session establishment and seven-subscriber live readback remain pending on the deployment host.
+
+## Drift detection boundary
+
+Drift detection now treats the authoritative readback as an evidence object rather than trusting only the lifecycle/version pair. For an `IN_SYNC` result it requires matching target, lifecycle state, canonical version, IMSI, UE IPv4, assurance marker and both `data`/`ims` service projections. Missing or malformed marker/service evidence is a fail-closed `DRIFT` result. The detector remains read-only; it has no repair path.
+
+## eSIM interrupted-write boundary
+
+The eSIM artifact store and canonical subscriber store are separate persistence domains. A cross-store transaction is not assumed. To avoid treating a partial write as success, `ESIM_GENERATE` first persists metadata-only artifact state and then advances canonical state. If execution is interrupted between those writes, a subsequent authorized execution can reconcile only an exact artifact whose subscriber, profile, SM-DP+ authority, activation reference, status and version match the canonical request. Mismatched artifacts are rejected. No raw matching ID or LPA URI is persisted.
 
 ## IMS implementation boundary
 
@@ -90,7 +99,7 @@ A future live eSIM gate requires an actual SM-DP+/provisioning service, supporte
 
 ## Validation note
 
-Workflow #284 completed successfully for commit `1802d86237d2e3a8c4b99e03ab3e3a7e0e6cddfe`. The run executed all 53 Project-72 Python assurance tests, the IMS static safety gate, the seven-UE renderer validation and the seven-subscriber Asterisk renderer validation. Subsequent documentation-only commits are not included in that run.
+Workflow #284 completed successfully for commit `1802d86237d2e3a8c4b99e03ab3e3a7e0e6cddfe`. The run executed all 53 Project-72 Python assurance tests, the IMS static safety gate, the seven-UE renderer validation and the seven-subscriber Asterisk renderer validation. The current branch contains later code commits for hardened drift detection and eSIM reconciliation; those commits are not represented by workflow #284 and must obtain a new CI result before being marked `PASS-CI`.
 
 CI validates deterministic source-level behavior only. No live Open5GS deployment, UE attach, RAN session, IMS call or public telephony interconnect has been claimed.
 
