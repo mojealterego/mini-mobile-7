@@ -64,7 +64,8 @@ class DriftDetector:
             return self._drift(subscriber, readback, "authoritative assurance marker is missing")
         if marker.get("subscriber_id") != subscriber.subscriber_id:
             return self._drift(subscriber, readback, "assurance marker subscriber mismatch")
-        if int(marker.get("canonical_version", -1)) != subscriber.version:
+        marker_version = _safe_int(marker.get("canonical_version"))
+        if marker_version != subscriber.version:
             return self._drift(subscriber, readback, "assurance marker version mismatch")
         if marker.get("status") != subscriber.status.value:
             return self._drift(subscriber, readback, "assurance marker lifecycle mismatch")
@@ -93,3 +94,10 @@ class DriftDetector:
             readback.observed_version,
             reason,
         )
+
+
+def _safe_int(value: object) -> int | None:
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
