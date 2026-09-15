@@ -19,6 +19,10 @@ EOF
 OUT=$1
 : "${MM7_MONGODB_URI:?MM7_MONGODB_URI is required}"
 : "${MM7_IDEMPOTENCY_DB_URI:?MM7_IDEMPOTENCY_DB_URI is required}"
+command -v mongodump >/dev/null 2>&1 || {
+  echo "mongodump is required" >&2
+  exit 1
+}
 
 mkdir -p "$OUT"
 chmod 700 "$OUT"
@@ -27,7 +31,7 @@ uri_host() {
   python3 - "$1" <<'PY'
 from urllib.parse import urlparse
 import sys
-u=urlparse(sys.argv[1])
+u = urlparse(sys.argv[1])
 print(u.hostname or "")
 PY
 }
@@ -36,17 +40,48 @@ for uri in "$MM7_MONGODB_URI" "$MM7_IDEMPOTENCY_DB_URI" ${MM7_ESIM_DB_URI:+"$MM7
   host=$(uri_host "$uri")
   case "$host" in
     localhost|127.0.0.1|::1) ;;
-    *) [[ "${MM7_BACKUP_ALLOW_REMOTE:-0}" == "1" ]] || { echo "Refusing remote MongoDB backup without MM7_BACKUP_ALLOW_REMOTE=1" >&2; exit 1; } ;;
+    *) [[ "${MM7_BACKUP_ALLOW_REMOTE:-0}" == "1" ]] || {
+      echo "Refusing remote MongoDB backup without MM7_BACKUP_ALLOW_REMOTE=1" >&2
+      exit 1
+    } ;;
   esac
 done
 
 backup_db() {
   local uri=$1 name=$2
   local target="$OUT/$name"
+  local archive="$target/database.archive"
+  local config_file
+
   mkdir -p "$target"
   chmod 700 "$target"
-  mongodump --uri="$uri" --archive="$target/database.archive" --gzip
-  chmod 600 "$target/database.archive"
+  rm -f "$archive"
+
+  # MongoDB Database Tools support --config specifically for sensitive URI
+  # values. Keep the URI out of the mongodump process arguments.
+  config_file=$(mktemp "$target/.mongodump-config.XXXXXX.yaml")
+  chmod 600 "$config_file"
+  python3 - "$uri" "$config_file" <<'PY'
+import json
+import sys
+
+uri, path = sys.argv[1], sys.argv[2]
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write(json.dumps({"uri": uri}, ensure_ascii=False))
+    handle.write("\n")
+PY
+
+  if ! mongodump --config="$config_file" --archive="$archive" --gzip; then
+    rm -f "$config_file" "$archive"
+    return 1
+  fi
+  rm -f "$config_file"
+  test -s "$archive" || {
+    echo "mongodump produced an empty archive: $archive" >&2
+    rm -f "$archive"
+    return 1
+  }
+  chmod 600 "$archive"
 }
 
 backup_db "$MM7_MONGODB_URI" canonical
