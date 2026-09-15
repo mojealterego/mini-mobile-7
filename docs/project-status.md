@@ -9,18 +9,18 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | Capability Broker | IMPLEMENTED IN CODE | Fail-closed authorization, target/version/capability/risk checks |
 | Assurance Core | IMPLEMENTED IN CODE | Authorization -> execution -> authoritative readback -> postcondition -> VERIFIED |
 | Optimistic concurrency | IMPLEMENTED IN CODE | `expected_version` enforced atomically by canonical repository implementations |
-| Idempotency | IMPLEMENTED IN CODE | Optional durable MongoDB reservation + terminal-result persistence; process-local cache remains the default unless a durable store is injected |
+| Idempotency | IMPLEMENTED IN CODE | Durable MongoDB reservation + terminal-result persistence; concurrent duplicate execution fails closed |
 | Drift detection | IMPLEMENTED IN CODE | Projection mismatch is classified as DRIFT; no automatic repair |
 | Open5GS v2.8.0 bootstrap | IMPLEMENTED | Exact source tag is built; floating `ppa:open5gs/latest` removed |
 | Subscriber lifecycle | IMPLEMENTED IN CODE | PROVISIONED -> ACTIVE -> SUSPENDED -> RETIRED with optimistic concurrency |
 | Lifecycle postconditions | IMPLEMENTED IN CODE | ACTIVATE/SUSPEND/DEACTIVATE each require authoritative readback and state-specific postcondition |
-| Seven-subscriber lifecycle tests | TESTED IN CI | Catalog, full 7001 lifecycle and wrong-version denial covered by deterministic tests |
-| CI validation | PENDING FRESH RUN | Previous workflow #99 passed before the latest runtime-wiring test/Makefile changes; a fresh run is required |
+| Seven-subscriber lifecycle tests | TESTED IN CI | Catalog, lifecycle and wrong-version denial covered by deterministic tests |
+| CI validation | PENDING FRESH RUN | Run #147 passed before the deterministic concurrent-race correction; corrected revision is awaiting fresh CI |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
 | Runtime provisioner | IMPLEMENTED IN CODE | `--execute` requires durable MongoDB idempotency URI and injects `MongoIdempotencyStore` into AssuranceCore |
 | UERANSIM gNB template | AUDITED | PLMN/TAC/SST/AMF/gNB addressing aligned with lab contract |
 | Seven-UE renderer | IMPLEMENTED | Deployment-local UE configs for 7001-7007; external authentication references |
-| Seven-UE renderer CI validation | IMPLEMENTED | Shell syntax and seven-config deterministic rendering tested with dummy credentials |
+| Seven-UE renderer CI validation | IMPLEMENTED | Shell syntax and seven-config deterministic rendering tested with synthetic credentials |
 | UERANSIM attach | PENDING HOST | Requires actual UERANSIM/Open5GS runtime |
 | Seven live subscriber projections | NEXT | Requires actual MongoDB/Open5GS runtime and external secrets |
 | UE Internet | READY | Requires actual host routing/NAT configuration |
@@ -53,6 +53,7 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 - Same key + completed result is replayed without execution.
 - A reservation without a terminal result fails closed as `CONFLICT`; there is deliberately no automatic lease takeover because taking over after an unknown crash could duplicate a non-idempotent telecom side effect.
 - Runtime `--execute` now requires the durable MongoDB idempotency URI and injects the durable store into AssuranceCore.
+- Added a deterministic concurrent race test proving that a second caller cannot execute the same telecom side effect while another caller owns the reservation.
 
 ## IMS boundary correction
 
