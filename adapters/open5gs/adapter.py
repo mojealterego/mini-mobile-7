@@ -92,7 +92,7 @@ class Open5GSAdapter:
         existing = self.collection.find_one({"imsi": target.imsi})
         existing_marker = _assurance_marker(existing)
         if existing_marker is not None:
-            existing_version = int(existing_marker.get("canonical_version", 0))
+            existing_version = _safe_int(existing_marker.get("canonical_version"), -1)
             if existing_version > target.version:
                 raise Open5GSAdapterError(
                     f"Open5GS projection is newer than canonical state for {target.subscriber_id}"
@@ -120,7 +120,7 @@ class Open5GSAdapter:
             )
 
         marker = _assurance_marker(document) or {}
-        observed_version = int(marker.get("canonical_version", 0))
+        observed_version = _safe_int(marker.get("canonical_version"), 0)
         state = _readback_state(subscriber, document)
         return AuthoritativeReadback(
             request_id="readback",
@@ -218,6 +218,13 @@ def _assurance_marker(document: Mapping[str, Any] | None) -> Mapping[str, Any] |
     return marker if isinstance(marker, Mapping) else None
 
 
+def _safe_int(value: Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def _projection_matches(subscriber: Subscriber, document: Mapping[str, Any]) -> bool:
     marker = _assurance_marker(document) or {}
     expected_status = subscriber.status.value
@@ -225,9 +232,9 @@ def _projection_matches(subscriber: Subscriber, document: Mapping[str, Any]) -> 
     if (
         document.get("imsi") != subscriber.imsi
         or marker.get("subscriber_id") != subscriber.subscriber_id
-        or int(marker.get("canonical_version", 0)) != subscriber.version
+        or _safe_int(marker.get("canonical_version"), -1) != subscriber.version
         or marker.get("status") != expected_status
-        or int(document.get("subscriber_status", -1)) != expected_open5gs_status
+        or _safe_int(document.get("subscriber_status"), -1) != expected_open5gs_status
     ):
         return False
 
