@@ -35,10 +35,10 @@ if grep -Eiq '(^|[[:space:]])password[[:space:]]*=[[:space:]]*[^$[:space:];]+' "
   exit 1
 fi
 
-# Architecture must remain private: no PSTN/public-PLMN gateway is part of the IMS template.
-if grep -Eiq '(^|[^A-Za-z])(pstn|public[[:space:]-]*plmn|tel:[+][0-9])' \
-    "$KAMAILIO_CFG" "$ASTERISK_CFG" "$DISPATCHER"; then
-  echo "public telephony gateway marker detected in IMS template" >&2
+# Ignore comments when checking for an actual public-telephony route.
+if sed '/^[[:space:]]*;/d' "$KAMAILIO_CFG" "$ASTERISK_CFG" "$DISPATCHER" \
+    | grep -Eiq '(^|[^A-Za-z])(pstn|public[[:space:]-]*plmn|tel:[+][0-9])'; then
+  echo "public telephony gateway marker detected in active IMS template content" >&2
   exit 1
 fi
 
