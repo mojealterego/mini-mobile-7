@@ -36,8 +36,19 @@ write_cmd firewall iptables -S
 write_cmd listening-sockets ss -lntup
 
 for service in mongod open5gs-amfd open5gs-smfd open5gs-upfd kamailio asterisk; do
-  write_cmd "service-${service}" systemctl status "$service" --no-pager
-  write_cmd "service-${service}-active" systemctl is-active "$service"
+  if command -v systemctl >/dev/null 2>&1; then
+    write_cmd "service-${service}" systemctl status "$service" --no-pager
+    write_cmd "service-${service}-active" systemctl is-active "$service"
+  else
+    {
+      printf '$ systemctl status %q --no-pager\n' "$service"
+      printf '%s\n' 'UNAVAILABLE: systemctl is not present on this host'
+    } >"$OUT_DIR/service-${service}.txt"
+    {
+      printf '$ systemctl is-active %q\n' "$service"
+      printf '%s\n' 'UNAVAILABLE: systemctl is not present on this host'
+    } >"$OUT_DIR/service-${service}-active.txt"
+  fi
 done
 
 if command -v mongosh >/dev/null 2>&1; then
@@ -58,7 +69,7 @@ fi
 if command -v systemctl >/dev/null 2>&1; then
   systemctl list-units --type=service --state=running --no-pager >"$OUT_DIR/running-services.txt" 2>&1 || true
 else
-  printf '%s\n' 'UNAVAILABLE: command not found: systemctl' >"$OUT_DIR/running-services.txt"
+  printf '%s\n' 'UNAVAILABLE: systemctl is not present on this host' >"$OUT_DIR/running-services.txt"
 fi
 
 printf 'Evidence written to %s\n' "$OUT_DIR"
