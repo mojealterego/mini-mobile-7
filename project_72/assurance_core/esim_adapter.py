@@ -5,7 +5,7 @@ from dataclasses import replace
 from typing import Any, Mapping
 
 from .esim import EsimArtifactGenerator, EsimProfileMetadata, EsimSecretResolver, EsimStatus
-from .esim_repository import EsimArtifactRepository, StoredEsimArtifact
+from .esim_repository import EsimArtifactNotFoundError, EsimArtifactRepository, StoredEsimArtifact
 from .models import AuthoritativeReadback, ExecutionRequest
 from .store import StoreConflictError, SubscriberRepository
 
@@ -16,6 +16,11 @@ class EsimProvisioningAdapter:
     This adapter does not contact an SM-DP+, install an eSIM on a handset, or
     claim device verification. VERIFIED means only that the generated artifact
     is durably represented and matches canonical state by authoritative readback.
+
+    The two stores are intentionally reconciled fail-closed: an artifact write
+    can never cause a canonical eSIM state to be assumed. A retry may promote a
+    matching, already-persisted artifact to canonical state without regenerating
+    a provisioning artifact or contacting an external eSIM service.
     """
 
     OPERATION = "ESIM_GENERATE"
@@ -49,6 +54,10 @@ class EsimProvisioningAdapter:
         if subscriber.esim_status not in {EsimStatus.PLANNED, EsimStatus.GENERATED}:
             raise ValueError(f"eSIM generation not allowed from {subscriber.esim_status.value}")
 
+        reconciled = self._reconcile_persisted_artifact(subscriber)
+        if reconciled is not None:
+            return reconciled
+
         artifact = self._generator.generate(
             EsimProfileMetadata(
                 subscriber_id=subscriber.subscriber_id,
@@ -75,9 +84,48 @@ class EsimProvisioningAdapter:
         self._repository.put(updated, expected_version=request.expected_version)
         return True
 
+    def _reconcile_persisted_artifact(self, subscriber: Any) -> bool | None:
+        """Promote only an exact artifact left by a previous interrupted commit."""
+        try:
+            artifact = self._artifacts.get(subscriber.subscriber_id)
+        except EsimArtifactNotFoundError:
+            return None
+
+        expected_version = subscriber.version + 1
+        if artifact.version != expected_version:
+            return None
+        if artifact.status != EsimStatus.GENERATED.value:
+            return None
+        if artifact.profile_id != subscriber.profile_id:
+            raise ValueError("persisted eSIM artifact profile does not match canonical state")
+        if artifact.smdp_address != self._smdp_address:
+            raise ValueError("persisted eSIM artifact SM-DP+ address does not match configured authority")
+        if artifact.activation_code_ref != subscriber.secret_refs.get("esim_activation"):
+            raise ValueError("persisted eSIM artifact activation reference does not match canonical state")
+
+        updated = replace(subscriber, version=expected_version, esim_status=EsimStatus.GENERATED)
+        self._repository.put(updated, expected_version=subscriber.version)
+        return True
+
     def readback(self, subscriber_id: str) -> AuthoritativeReadback:
         canonical = self._repository.get(subscriber_id)
-        artifact = self._artifacts.get(subscriber_id)
+        try:
+            artifact = self._artifacts.get(subscriber_id)
+        except EsimArtifactNotFoundError:
+            return AuthoritativeReadback(
+                request_id="eSIM-readback",
+                source="canonical-subscriber-store+esim-artifact-store",
+                target=subscriber_id,
+                observed_version=canonical.version,
+                state="ABSENT",
+                fingerprint="",
+                details={
+                    "subscriber_id": subscriber_id,
+                    "canonical_version": canonical.version,
+                    "canonical_esim_status": canonical.esim_status.value,
+                },
+            )
+
         consistent = (
             canonical.version == artifact.version
             and canonical.profile_id == artifact.profile_id
