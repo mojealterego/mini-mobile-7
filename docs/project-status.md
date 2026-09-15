@@ -4,9 +4,9 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 
 | Stage | Status | Completion condition |
 |---|---|---|
-| Project-72 contracts | IMPLEMENTED IN CODE | Subscriber, capability, execution, readback, postcondition and assurance-result schemas |
+| Project-72 contracts | IMPLEMENTED IN CODE | Subscriber, capability, execution, readback, postcondition, assurance-result, private-identity and eSIM artifact schemas |
 | Canonical Subscriber Store | IMPLEMENTED IN CODE | MongoDB + deterministic seven-subscriber catalog |
-| Capability Broker | IMPLEMENTED IN CODE | Fail-closed authorization, target/version/capability/risk checks |
+| Capability Broker | IMPLEMENTED IN CODE | Fail-closed authorization, target/version/capability/risk checks, including eSIM operations |
 | Assurance Core | IMPLEMENTED IN CODE | Authorization -> execution -> authoritative readback -> postcondition -> VERIFIED |
 | Optimistic concurrency | IMPLEMENTED IN CODE | `expected_version` enforced atomically by canonical repository implementations |
 | Idempotency | IMPLEMENTED IN CODE | Durable MongoDB reservation + terminal-result persistence; concurrent duplicate execution fails closed |
@@ -15,7 +15,10 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | Subscriber lifecycle | IMPLEMENTED IN CODE | PROVISIONED -> ACTIVE -> SUSPENDED -> RETIRED with optimistic concurrency |
 | Lifecycle postconditions | IMPLEMENTED IN CODE | ACTIVATE/SUSPEND/DEACTIVATE each require authoritative readback and state-specific postcondition |
 | Seven-subscriber lifecycle tests | TESTED IN CI | Catalog, lifecycle and wrong-version denial covered by deterministic tests |
-| CI validation | PASS-CI | Workflow run #177 passed after runtime-wiring/dry-run and host-evidence changes |
+| Identity generator | IMPLEMENTED IN CODE | Deterministic private identity records for 7001–7007 |
+| eSIM artifact generation | IMPLEMENTED IN CODE | External matching ID reference -> LPA artifact; no raw activation secret persisted |
+| eSIM AssuranceCore path | TESTED IN CI | `ESIM_GENERATE` authorization, execution, readback and postcondition chain |
+| CI validation | PASS-CI | Latest confirmed Project-72 run #236 passed |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
 | Runtime provisioner | IMPLEMENTED IN CODE | `--execute` requires durable MongoDB idempotency URI and injects `MongoIdempotencyStore` into AssuranceCore |
 | Runtime dry-run boundary | IMPLEMENTED IN CODE | Dry-run exits before runtime database construction or mutation path |
@@ -26,44 +29,9 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | Seven live subscriber projections | NEXT | Requires actual MongoDB/Open5GS runtime and external secrets |
 | UE Internet | READY | Requires actual host routing/NAT configuration |
 | IMS/Kamailio | SCAFFOLD | Private-network ACL scaffold corrected; requires live Kamailio/Asterisk host validation |
+| IMS external reference audit | COMPLETE | PJSIP archive, Pixel IMS module and GSM-SIP bridge audited; decisions recorded in `docs/ims-external-reference-2026-09-15.md` |
 | Host evidence collector | IMPLEMENTED | Read-only service/network/config evidence capture for Gate 4E/5/7 |
 | Physical RAN | BLOCKED | Requires lawful RF authorization, suitable hardware and conformity/location checks |
-
-## Phase 2D — UERANSIM boundary
-
-- Existing gNB and UE templates were audited.
-- gNB lab contract: PLMN `001/01`, TAC `1`, SST `1`, AMF `10.10.0.5`, gNB `10.10.0.6`.
-- Deployment-local rendering exists for all seven UE identities.
-- Renderer validates IMSI, MCC/MNC, gNB address and external authentication material shape.
-- Authentication material is not supplied to the renderer as command-line arguments.
-- Generated runtime files are excluded from Git through `runtime/` in `.gitignore`.
-- CI uses synthetic non-production authentication values only.
-- Dedicated renderer tests verify all seven identity mappings, `0600` output permissions, missing-secret fail-closed behavior and malformed authentication-material rejection.
-
-## Gate 3B — optimistic concurrency
-
-- Added a deterministic two-writer race against `7001` with both writers using `expected_version=1`.
-- Exactly one writer must commit `v2 ACTIVE`.
-- The other writer must receive `StoreConflictError` and is classified as `CONFLICT` at the assurance layer.
-- The in-memory repository now protects the compare-and-write operation with a lock; the MongoDB implementation already uses an atomic `find_one_and_update` predicate on `subscriber_id + version`.
-
-## Gate 3C — durable idempotency reservation
-
-- Added `InMemoryIdempotencyStore` as a deterministic reference implementation.
-- Added `MongoIdempotencyStore` backed by a unique `key` index.
-- A request reserves its idempotency key before execution; another process with the same key cannot start a second execution.
-- Same key + different fingerprint is `CONFLICT`.
-- Same key + completed result is replayed without execution.
-- A reservation without a terminal result fails closed as `CONFLICT`; there is deliberately no automatic lease takeover because taking over after an unknown crash could duplicate a non-idempotent telecom side effect.
-- Runtime `--execute` now requires the durable MongoDB idempotency URI and injects the durable store into AssuranceCore.
-- Added a deterministic concurrent race test proving that a second caller cannot execute the same telecom side effect while another caller owns the reservation.
-
-## Gate 4D — runtime wiring and seven-way projection
-
-- Runtime preflight receives the same canonical MongoDB URI and durable idempotency URI used by execution.
-- Runtime `--execute` refuses to proceed without durable idempotency storage.
-- Dry-run remains dependency-free from the mutation path and must not construct runtime MongoDB/Open5GS adapters.
-- Open5GS adapter/integration coverage exercises all seven catalog subscribers through projection and authoritative readback.
 
 ## Gate 4E — host acceptance boundary
 
@@ -76,6 +44,42 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 - Corrected the Kamailio example ACL to use a deterministic private IMS source-address check instead of the previously unverified `ipops_check_ip` expression.
 - The example remains deployment scaffolding and requires validation with the installed Kamailio version before live activation.
 - Asterisk TLS/SRTP configuration remains a deployment template; no public SIP/PSTN trunk is configured.
+
+## External IMS reference decisions
+
+### PJSIP archive
+
+`mojealterego/pjproject-archive` is treated as a historical PJSIP/PJMEDIA reference. Its README describes an old classic PJSIP build flow and is not used as the Project-72 version authority. No source-tree copy is imported into MINI-MOBILE-7.
+
+### Pixel VoLTE/IMS module
+
+`mojealterego/Pixel-turn-on-5G-Volte-and-automatically-register-with-IMS` is treated as a device-side diagnostic/reference source. Its boot-time operator detection, IMS service restart and registration observation are useful as concepts, but carrier-specific debug properties and a claimed `imsregistered` property are not accepted as authoritative network proof.
+
+### GSM-SIP bridge
+
+`selvakn/gsm-sip-bridge` is treated as an interoperability/reference implementation. Strict configuration, TLS, recovery and observability patterns are adaptable. Its carrier-facing VoWiFi/ePDG, host-side carrier VoLTE, automated cellular outbound calling and privileged/host-network container defaults are not adopted as the MINI-MOBILE-7 private IMS architecture.
+
+The resulting private IMS architecture remains:
+
+```text
+Canonical Subscriber Store
+        -> Capability Broker
+        -> Assurance Core
+        -> Open5GS projection
+        -> private IMS authorization/config
+        -> Kamailio
+        -> Asterisk/PJSIP
+```
+
+The external repositories do not become alternative subscriber authorities and cannot bypass Project-72 authorization, idempotency, `expected_version`, authoritative readback or postconditions.
+
+## eSIM boundary
+
+Project-72 can generate an LPA activation artifact only when a real provisioning system supplies an external matching ID through a secret reference. It does not manufacture a GSMA profile, impersonate an SM-DP+, install a profile on a handset, or claim device verification.
+
+`GENERATED != INSTALLED != VERIFIED`.
+
+A future live eSIM gate requires an actual SM-DP+/provisioning service, supported LPA/device, device-side installation evidence and authoritative readback.
 
 ## Validation note
 
