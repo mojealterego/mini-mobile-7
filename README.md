@@ -116,15 +116,20 @@ docs/                   Architecture, deployment, legal and status notes
 ```bash
 make validate
 make assurance-test
+make ims-config-check
 ```
+
+`make ims-config-check` is a static safety gate. It does not prove live SIP registration, TLS certificate validation, SRTP negotiation or calls.
 
 ## Project-72 implementation log
 
 Substantive Project-72 implementation work is recorded in `docs/project-72-session-log-2026-09-15.md` and `docs/project-status.md`. The current codebase includes the canonical subscriber store, fail-closed Capability Broker, Assurance Core, optimistic concurrency, durable idempotency, Open5GS v2.8.0 projection/readback, seven-UE UERANSIM rendering, runtime preflight/dry-run boundaries, host evidence collection, private identity generation and a controlled eSIM activation-artifact boundary.
 
+The private IMS boundary now includes explicit Kamailio REGISTER routing, a deployment-time seven-subscriber Asterisk/PJSIP renderer and a static IMS safety gate covering private binds, TLS/SRTP requirements, external credentials and absence of an active public-telephony route.
+
 The latest external IMS reference audit covers `mojealterego/pjproject-archive`, `mojealterego/Pixel-turn-on-5G-Volte-and-automatically-register-with-IMS` and `selvakn/gsm-sip-bridge`. The audit is documented in `docs/ims-external-reference-2026-09-15.md`. These repositories are used selectively as reference material; they do not replace Project-72 authorization, canonical state, Open5GS version pinning, or authoritative readback.
 
-Latest confirmed Project-72 CI: workflow run #236 completed successfully for commit `48cf0904165e7a26f4199c08e1b7dc474ff35a09`.
+Latest previously confirmed Project-72 CI: workflow run #236 completed successfully for commit `48cf0904165e7a26f4199c08e1b7dc474ff35a09`. A new workflow was triggered after the IMS/CI changes and must complete before the latest HEAD is marked CI-verified.
 
 ### Current limitations
 
