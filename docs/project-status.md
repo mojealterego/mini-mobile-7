@@ -20,8 +20,9 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | eSIM AssuranceCore path | TESTED IN CI | `ESIM_GENERATE` authorization, execution, readback and postcondition chain |
 | Asterisk PJSIP renderer | IMPLEMENTED IN CODE | Seven private endpoints rendered from external secrets; 0600 runtime file and injection checks |
 | Kamailio REGISTER routing | IMPLEMENTED IN CONFIG | Private REGISTER traffic routed to controlled Asterisk registrar; live validation pending |
+| IMS static safety gate | IMPLEMENTED | Private bind, TLS/SRTP baseline, external credentials and no public telephony route checked in CI |
 | IMS external reference audit | COMPLETE | PJSIP archive, Pixel IMS module and GSM-SIP bridge audited; decisions recorded in `docs/ims-external-reference-2026-09-15.md` |
-| CI validation | PASS-CI | Latest confirmed Project-72 run #236 passed before the newest renderer/IMS commits |
+| CI validation | QUEUED | Workflow #271 was triggered by the latest CI/IMS changes; final result must be confirmed after completion |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
 | Runtime provisioner | IMPLEMENTED IN CODE | `--execute` requires durable MongoDB idempotency URI and injects `MongoIdempotencyStore` into AssuranceCore |
 | Runtime dry-run boundary | IMPLEMENTED IN CODE | Dry-run exits before runtime database construction or mutation path |
@@ -43,12 +44,13 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 
 ## IMS implementation boundary
 
-The private IMS path now has two additional code/configuration pieces:
+The private IMS path now has three code/configuration controls:
 
 1. Kamailio explicitly routes `REGISTER` only after the private IMS source-address gate and dispatches it to the controlled Asterisk registrar.
 2. `scripts/project-72-render-asterisk-pjsip.sh` renders seven Asterisk/PJSIP endpoint/AOR/auth blocks from external `MM7_SIP_PASSWORD_7001` through `MM7_SIP_PASSWORD_7007` values. Secrets are not CLI arguments, the output is `0600`, and unsafe configuration characters are rejected.
+3. `scripts/project-72-ims-config-check.sh` provides a static safety gate for private binds, TLS/SRTP requirements, external credentials and absence of an active public-telephony route. It explicitly does not claim live SIP operation.
 
-The renderer is a deployment mechanism, not evidence of live registration. The installed Asterisk/Kamailio versions must validate the generated configuration before activation.
+The renderer and static gate are deployment controls, not evidence of live registration. The installed Asterisk/Kamailio versions must validate the generated configuration before activation.
 
 ## External IMS reference decisions
 
