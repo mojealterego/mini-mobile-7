@@ -112,6 +112,10 @@ docs/                   Architecture, deployment, recovery, legal and status not
 
 ## Validation status
 
-Workflow **#347** on `project-72/phase-2a` completed successfully on Ubuntu 22.04 and passed the Project-72 assurance suite, metrics exporter, IMS static safety gate, security/isolation gate, UERANSIM renderer and Asterisk PJSIP renderer. The branch subsequently received additional defensive hardening for malformed Open5GS assurance markers and backup URI handling; the subsequent CI run is required to confirm those latest commits.
+Workflow **#358** for commit `e15bdc4b555394cade7bb469cc1914c127e494fe` completed successfully on Ubuntu 22.04 and passed the Project-72 assurance suite, metrics exporter, IMS static safety gate, security/isolation gate, UERANSIM renderer and Asterisk PJSIP renderer. Subsequent commits harden host-evidence/systemd handling and runtime-preflight diagnostics; those changes require the next CI run.
 
 CI/source tests do not prove live Open5GS deployment, UERANSIM attachment, UE Internet, IMS TLS/SRTP calls, eSIM installation, physical RAN operation or lawful spectrum use.
+
+## Runtime host requirement
+
+Runtime provisioning requires a real Ubuntu 22.04 host with systemd, MongoDB 8.0, Open5GS services, `ogstun`, IPv4 forwarding, readable firewall policy, durable idempotency storage and externally resolved authentication references. A proot/container environment without systemd or the required network capabilities is intentionally blocked by preflight; it remains suitable for source builds, static checks and deterministic tests only.
