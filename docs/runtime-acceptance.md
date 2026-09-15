@@ -82,24 +82,50 @@ After stable data-plane operation:
 
 1. Start Kamailio on the private IMS network.
 2. Start Asterisk behind the Kamailio boundary.
-3. Validate TLS certificate chain and private-key permissions.
-4. Validate SRTP negotiation.
-5. Register only the seven authorized internal identities.
-6. Place an internal test call between two authorized subscribers.
-7. Validate SIP signalling, RTP/SRTP media and teardown.
-8. Validate MESSAGE/SMS behavior only if the selected UE/core/IMS stack actually supports the required SMS-over-IMS path.
+3. Validate the generated PJSIP configuration with the installed Asterisk version before enabling endpoints.
+4. Validate TLS certificate chain and private-key permissions.
+5. Validate SRTP negotiation.
+6. Register only the seven authorized internal identities.
+7. Place an internal test call between two authorized subscribers.
+8. Validate SIP signalling, RTP/SRTP media and teardown.
+9. Validate MESSAGE/SMS behavior only if the selected UE/core/IMS stack actually supports the required SMS-over-IMS path.
 
 A SIP `200 OK` is not sufficient for Project-72 `VERIFIED`; the IMS state must have an authoritative readback and postcondition.
 
 ## Gate 6 — drift and recovery
 
-Intentionally change one controlled Open5GS projection field in the lab, then run readback. Expected result:
+Intentionally change one controlled Open5GS projection field in the lab, then run authoritative readback. The minimum drift matrix is:
 
-```text
-projection mismatch -> DRIFT
-```
+| Mutation | Expected result |
+|---|---|
+| lifecycle state | `DRIFT` |
+| canonical/version marker | `DRIFT` |
+| IMSI | `DRIFT` |
+| UE IPv4 | `DRIFT` |
+| `data` or `ims` session | `DRIFT` |
+| missing assurance marker | `DRIFT` |
+| missing service evidence | `DRIFT` |
+| projection absent | `ABSENT` |
 
 The assurance layer must not silently repair the projection. Repair, if introduced later, must be a separate explicitly authorized operation with its own assurance record.
+
+## Gate 6E — eSIM artifact and device acceptance
+
+The source-level eSIM path ends at `GENERATED`. It does not prove profile installation or device registration.
+
+For a real provisioning deployment:
+
+1. obtain the activation material from the actual authorized provisioning system through the external secret reference;
+2. generate the metadata-only Project-72 artifact;
+3. perform authoritative artifact readback and postcondition validation;
+4. install the profile through a supported LPA/device flow;
+5. capture device-side installation evidence without treating local UI flags as network authority;
+6. obtain authoritative provisioning-system/device readback;
+7. only then transition the canonical eSIM state toward `INSTALLED`/`VERIFIED` according to the implemented external authority contract.
+
+`GENERATED != INSTALLED != VERIFIED`.
+
+If an interrupted eSIM generation leaves an artifact but canonical state has not advanced, a retry may reconcile only an exact artifact matching subscriber, profile, SM-DP+ authority, activation reference and expected version. A mismatched artifact must remain rejected.
 
 ## Gate 7 — security and isolation
 
