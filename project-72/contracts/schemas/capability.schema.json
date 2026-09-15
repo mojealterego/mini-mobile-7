@@ -8,7 +8,7 @@
   "properties": {
     "capability_id": {"type": "string", "minLength": 8},
     "principal": {"type": "string", "minLength": 1},
-    "operation": {"type": "string", "enum": ["READ", "PROVISION", "ACTIVATE", "SUSPEND", "DEACTIVATE", "ROUTE_CALL", "READBACK"]},
+    "operation": {"type": "string", "enum": ["READ", "PROVISION", "ACTIVATE", "SUSPEND", "DEACTIVATE", "ROUTE_CALL", "READBACK", "ESIM_GENERATE", "ESIM_ACTIVATE", "ESIM_READBACK"]},
     "resource": {"type": "string", "minLength": 1},
     "decision": {"type": "string", "enum": ["ALLOW", "DENY"]},
     "policy_version": {"type": "string", "minLength": 1},
