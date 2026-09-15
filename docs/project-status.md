@@ -18,7 +18,10 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | Identity generator | IMPLEMENTED IN CODE | Deterministic private identity records for 7001–7007 |
 | eSIM artifact generation | IMPLEMENTED IN CODE | External matching ID reference -> LPA artifact; no raw activation secret persisted |
 | eSIM AssuranceCore path | TESTED IN CI | `ESIM_GENERATE` authorization, execution, readback and postcondition chain |
-| CI validation | PASS-CI | Latest confirmed Project-72 run #236 passed |
+| Asterisk PJSIP renderer | IMPLEMENTED IN CODE | Seven private endpoints rendered from external secrets; 0600 runtime file and injection checks |
+| Kamailio REGISTER routing | IMPLEMENTED IN CONFIG | Private REGISTER traffic routed to controlled Asterisk registrar; live validation pending |
+| IMS external reference audit | COMPLETE | PJSIP archive, Pixel IMS module and GSM-SIP bridge audited; decisions recorded in `docs/ims-external-reference-2026-09-15.md` |
+| CI validation | PASS-CI | Latest confirmed Project-72 run #236 passed before the newest renderer/IMS commits |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
 | Runtime provisioner | IMPLEMENTED IN CODE | `--execute` requires durable MongoDB idempotency URI and injects `MongoIdempotencyStore` into AssuranceCore |
 | Runtime dry-run boundary | IMPLEMENTED IN CODE | Dry-run exits before runtime database construction or mutation path |
@@ -28,8 +31,7 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | UERANSIM attach | PENDING HOST | Requires actual UERANSIM/Open5GS runtime |
 | Seven live subscriber projections | NEXT | Requires actual MongoDB/Open5GS runtime and external secrets |
 | UE Internet | READY | Requires actual host routing/NAT configuration |
-| IMS/Kamailio | SCAFFOLD | Private-network ACL scaffold corrected; requires live Kamailio/Asterisk host validation |
-| IMS external reference audit | COMPLETE | PJSIP archive, Pixel IMS module and GSM-SIP bridge audited; decisions recorded in `docs/ims-external-reference-2026-09-15.md` |
+| IMS/Kamailio | SCAFFOLD+ | REGISTER routing and Asterisk endpoint rendering implemented; live TLS/SRTP registration/call validation remains pending |
 | Host evidence collector | IMPLEMENTED | Read-only service/network/config evidence capture for Gate 4E/5/7 |
 | Physical RAN | BLOCKED | Requires lawful RF authorization, suitable hardware and conformity/location checks |
 
@@ -39,11 +41,14 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 - The collector intentionally does not mutate services, subscribers or Open5GS state and is designed to capture evidence before/after live acceptance.
 - Actual UERANSIM attach, PDU-session establishment and seven-subscriber live readback remain pending on the deployment host.
 
-## IMS boundary correction
+## IMS implementation boundary
 
-- Corrected the Kamailio example ACL to use a deterministic private IMS source-address check instead of the previously unverified `ipops_check_ip` expression.
-- The example remains deployment scaffolding and requires validation with the installed Kamailio version before live activation.
-- Asterisk TLS/SRTP configuration remains a deployment template; no public SIP/PSTN trunk is configured.
+The private IMS path now has two additional code/configuration pieces:
+
+1. Kamailio explicitly routes `REGISTER` only after the private IMS source-address gate and dispatches it to the controlled Asterisk registrar.
+2. `scripts/project-72-render-asterisk-pjsip.sh` renders seven Asterisk/PJSIP endpoint/AOR/auth blocks from external `MM7_SIP_PASSWORD_7001` through `MM7_SIP_PASSWORD_7007` values. Secrets are not CLI arguments, the output is `0600`, and unsafe configuration characters are rejected.
+
+The renderer is a deployment mechanism, not evidence of live registration. The installed Asterisk/Kamailio versions must validate the generated configuration before activation.
 
 ## External IMS reference decisions
 
