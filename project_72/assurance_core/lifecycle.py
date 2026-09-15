@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
-from .models import Subscriber, SubscriberStatus
+from .models import EsimStatus, Subscriber, SubscriberStatus
 from .store import StoreConflictError, SubscriberRepository
 
 
@@ -33,8 +33,7 @@ def transition(subscriber: Subscriber, operation: str) -> Subscriber:
         raise LifecycleError(f"unsupported lifecycle operation: {operation}") from exc
     if subscriber.status is not rule.source:
         raise LifecycleError(
-            f"{operation} requires {rule.source.value}; "
-            f"subscriber {subscriber.subscriber_id} is {subscriber.status.value}"
+            f"{operation} requires {rule.source.value}; subscriber {subscriber.subscriber_id} is {subscriber.status.value}"
         )
     return Subscriber(
         subscriber_id=subscriber.subscriber_id,
@@ -45,6 +44,8 @@ def transition(subscriber: Subscriber, operation: str) -> Subscriber:
         secret_refs=subscriber.secret_refs,
         services=subscriber.services,
         msisdn=subscriber.msisdn,
+        profile_id=subscriber.profile_id,
+        esim_status=subscriber.esim_status if subscriber.esim_status is not EsimStatus.VERIFIED else EsimStatus.VERIFIED,
     )
 
 
