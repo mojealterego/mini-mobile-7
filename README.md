@@ -74,7 +74,7 @@ make host-evidence
 
 ## Backup and recovery
 
-Use `scripts/project-72-backup.sh` with protected runtime MongoDB URIs. It backs up canonical, durable idempotency and optional eSIM metadata domains independently, generates checksums and excludes raw secrets/private keys. Restore first into an isolated MongoDB target; follow `docs/backup-recovery.md` before considering production recovery.
+Use `scripts/project-72-backup.sh` with protected runtime MongoDB URIs. It backs up canonical, durable idempotency and optional eSIM metadata domains independently, generates checksums and excludes raw secrets/private keys. The backup uses MongoDB Database Tools `--config` for sensitive connection URIs so credentials are not placed in the `mongodump` process arguments. Restore first into an isolated MongoDB target; follow `docs/backup-recovery.md` before considering production recovery.
 
 ## Lab-first rule
 
@@ -112,6 +112,6 @@ docs/                   Architecture, deployment, recovery, legal and status not
 
 ## Validation status
 
-The latest confirmed CI run before this operations batch was successful and covered 63 assurance tests, IMS static safety, UERANSIM rendering and Asterisk rendering. The newly added security, telemetry and backup/recovery controls require the subsequent CI run for confirmation.
+Workflow **#347** on `project-72/phase-2a` completed successfully on Ubuntu 22.04 and passed the Project-72 assurance suite, metrics exporter, IMS static safety gate, security/isolation gate, UERANSIM renderer and Asterisk PJSIP renderer. The branch subsequently received additional defensive hardening for malformed Open5GS assurance markers and backup URI handling; the subsequent CI run is required to confirm those latest commits.
 
 CI/source tests do not prove live Open5GS deployment, UERANSIM attachment, UE Internet, IMS TLS/SRTP calls, eSIM installation, physical RAN operation or lawful spectrum use.
