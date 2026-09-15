@@ -64,13 +64,33 @@ The renderer and REGISTER route are configuration/automation completion only; li
 
 Added `scripts/project-72-ims-config-check.sh` and `make ims-config-check` as a deterministic static gate. It verifies the private IMS bind/routing boundary, TLS and SRTP baseline, external credential references and absence of an active public-telephony route in the checked-in templates. It deliberately does not claim live SIP/TLS/SRTP operation.
 
-Extended the Project-72 GitHub Actions workflow to run the IMS static gate and Asterisk PJSIP renderer validation in addition to the existing assurance and UERANSIM suites. The workflow now exercises the renderer with synthetic CI-only SIP credentials and checks the generated file permissions and seven-way endpoint structure.
+Extended the Project-72 GitHub Actions workflow to run the IMS static gate and Asterisk PJSIP renderer validation in addition to the existing assurance and UERANSIM suites. The workflow exercises the renderer with synthetic CI-only SIP credentials and checks the generated file permissions and seven-way endpoint structure.
 
-A new workflow run was triggered by these changes. Its final result must be confirmed before the latest branch state is marked `PASS-CI`.
+Workflow #284 completed successfully for commit `1802d86237d2e3a8c4b99e03ab3e3a7e0e6cddfe`.
 
-### 9. Documentation continuity
+### 9. Drift detection hardening
 
-Updated `README.md`, `docs/project-status.md` and this session log with the IMS static gate and current CI boundary.
+Expanded `DriftDetector` so an `IN_SYNC` result requires authoritative agreement on target, lifecycle state, version, IMSI, UE IPv4, assurance marker and the `data`/`ims` service projections. Missing or malformed marker/service evidence is classified fail-closed as `DRIFT`. The detector remains strictly read-only and has no automatic repair path.
+
+Expanded drift tests to cover target, lifecycle, version, IMSI, UE IP, marker, malformed marker and missing service evidence.
+
+The Open5GS adapter readback now exposes the projected UE IPv4 and assurance marker explicitly, allowing the detector to evaluate these invariants without parsing the raw MongoDB document outside the adapter.
+
+### 10. eSIM interrupted-write reconciliation
+
+Hardened `ESIM_GENERATE` around its two persistence domains. The artifact store remains metadata-only and is written before canonical eSIM state is advanced. A retry can reconcile an artifact left behind by an interrupted canonical write only when subscriber ID, profile ID, SM-DP+ authority, activation reference, status and expected version all match the canonical request.
+
+A mismatched persisted artifact is rejected rather than adopted. Reconciliation does not regenerate an artifact or invoke the external matching-ID resolver. This is a durable reconciliation mechanism, not an assumption of a cross-store transaction.
+
+Added tests covering exact reconciliation and mismatched-profile rejection.
+
+### 11. Lifecycle cleanup
+
+Simplified lifecycle transition state preservation so the canonical `esim_status` is carried forward directly rather than through a redundant conditional expression. This preserves the same immutable-state semantics while removing dead branching.
+
+### 12. Documentation continuity
+
+Updated `README.md`, `docs/project-status.md` and this session log with the hardened drift boundary and eSIM interrupted-write reconciliation. The status document explicitly separates the last confirmed CI SHA from later untested code commits.
 
 ## Current engineering boundary
 
@@ -83,12 +103,13 @@ Code and deterministic tests cover:
 - optimistic concurrency;
 - durable idempotency semantics and concurrent duplicate fail-closed behavior;
 - Open5GS v2.8.0 projection/readback adapter;
+- hardened seven-subscriber drift detection;
 - seven-subscriber deterministic projection tests;
 - UERANSIM seven-UE rendering and validation;
 - runtime preflight and dry-run safety boundary;
 - read-only host evidence capture;
 - deterministic private identities;
-- eSIM activation-artifact generation and assurance path;
+- eSIM activation-artifact generation, assurance path and interrupted-write reconciliation;
 - Asterisk seven-subscriber PJSIP rendering;
 - private Kamailio REGISTER dispatch;
 - private IMS static safety gate;
@@ -96,6 +117,7 @@ Code and deterministic tests cover:
 
 The following still require the actual controlled deployment host or external service/device:
 
+- new CI validation for the latest hardened code commits;
 - MongoDB canonical/idempotency database acceptance;
 - Open5GS v2.8.0 live projection and authoritative readback;
 - UERANSIM gNB/UE attach and PDU-session validation for 7001–7007;
