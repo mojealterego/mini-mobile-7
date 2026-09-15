@@ -60,9 +60,17 @@ Updated the Kamailio example so private `REGISTER` traffic is explicitly dispatc
 
 The renderer and REGISTER route are configuration/automation completion only; live TLS, SIP registration and media still require the controlled host.
 
-### 8. Documentation continuity
+### 8. Static IMS safety gate and CI closure
 
-Updated `README.md`, `docs/project-status.md` and this session log with the IMS renderer, REGISTER boundary and external repository audit.
+Added `scripts/project-72-ims-config-check.sh` and `make ims-config-check` as a deterministic static gate. It verifies the private IMS bind/routing boundary, TLS and SRTP baseline, external credential references and absence of an active public-telephony route in the checked-in templates. It deliberately does not claim live SIP/TLS/SRTP operation.
+
+Extended the Project-72 GitHub Actions workflow to run the IMS static gate and Asterisk PJSIP renderer validation in addition to the existing assurance and UERANSIM suites. The workflow now exercises the renderer with synthetic CI-only SIP credentials and checks the generated file permissions and seven-way endpoint structure.
+
+A new workflow run was triggered by these changes. Its final result must be confirmed before the latest branch state is marked `PASS-CI`.
+
+### 9. Documentation continuity
+
+Updated `README.md`, `docs/project-status.md` and this session log with the IMS static gate and current CI boundary.
 
 ## Current engineering boundary
 
@@ -83,7 +91,8 @@ Code and deterministic tests cover:
 - eSIM activation-artifact generation and assurance path;
 - Asterisk seven-subscriber PJSIP rendering;
 - private Kamailio REGISTER dispatch;
-- private IMS scaffolding and external IMS/PJSIP reference audit.
+- private IMS static safety gate;
+- external IMS/PJSIP reference audit.
 
 The following still require the actual controlled deployment host or external service/device:
 
