@@ -47,6 +47,18 @@ request_route {
         exit;
     }
 
+    # REGISTER is relayed to the controlled Asterisk registrar. Registration
+    # remains limited to the private IMS network and must be correlated with
+    # canonical subscriber authorization at the application boundary.
+    if (is_method("REGISTER")) {
+        if (!ds_select_dst("1", "4")) {
+            sl_send_reply("503", "IMS Registrar Unavailable");
+            exit;
+        }
+        route(RELAY);
+        exit;
+    }
+
     # Keep routing deterministic: Kamailio is the IMS SIP control-plane proxy;
     # Asterisk is the controlled service/media endpoint.
     if (is_method("INVITE|MESSAGE|BYE|ACK|UPDATE|PRACK|INFO|NOTIFY|SUBSCRIBE")) {
