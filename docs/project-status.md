@@ -20,9 +20,9 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | eSIM AssuranceCore path | TESTED IN CI | `ESIM_GENERATE` authorization, execution, readback and postcondition chain |
 | Asterisk PJSIP renderer | IMPLEMENTED IN CODE | Seven private endpoints rendered from external secrets; 0600 runtime file and injection checks |
 | Kamailio REGISTER routing | IMPLEMENTED IN CONFIG | Private REGISTER traffic routed to controlled Asterisk registrar; live validation pending |
-| IMS static safety gate | IMPLEMENTED | Private bind, TLS/SRTP baseline, external credentials and no public telephony route checked in CI |
+| IMS static safety gate | TESTED IN CI | Private bind, TLS/SRTP baseline, external credentials and no public telephony route checked in CI |
 | IMS external reference audit | COMPLETE | PJSIP archive, Pixel IMS module and GSM-SIP bridge audited; decisions recorded in `docs/ims-external-reference-2026-09-15.md` |
-| CI validation | QUEUED | Workflow #271 was triggered by the latest CI/IMS changes; final result must be confirmed after completion |
+| CI validation | PASS-CI | Workflow #284 passed for commit `1802d86237d2e3a8c4b99e03ab3e3a7e0e6cddfe`; 53 assurance tests + IMS gate + UERANSIM/Asterisk renderer checks |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
 | Runtime provisioner | IMPLEMENTED IN CODE | `--execute` requires durable MongoDB idempotency URI and injects `MongoIdempotencyStore` into AssuranceCore |
 | Runtime dry-run boundary | IMPLEMENTED IN CODE | Dry-run exits before runtime database construction or mutation path |
@@ -89,6 +89,8 @@ Project-72 can generate an LPA activation artifact only when a real provisioning
 A future live eSIM gate requires an actual SM-DP+/provisioning service, supported LPA/device, device-side installation evidence and authoritative readback.
 
 ## Validation note
+
+Workflow #284 completed successfully for commit `1802d86237d2e3a8c4b99e03ab3e3a7e0e6cddfe`. The run executed all 53 Project-72 Python assurance tests, the IMS static safety gate, the seven-UE renderer validation and the seven-subscriber Asterisk renderer validation. Subsequent documentation-only commits are not included in that run.
 
 CI validates deterministic source-level behavior only. No live Open5GS deployment, UE attach, RAN session, IMS call or public telephony interconnect has been claimed.
 
