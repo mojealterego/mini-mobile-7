@@ -66,6 +66,14 @@ Only after the seven projections are verified:
 5. Perform authoritative readback from the core and compare it with the canonical record.
 6. Repeat for `7002`–`7007`.
 
+Use the read-only evidence collector before and after the sequence:
+
+```bash
+bash scripts/project-72-host-evidence.sh ./runtime/evidence
+```
+
+The collector records host/service/network state and hashes of deployment-local configuration files; it does not print authentication material and does not change the telecom configuration.
+
 No physical RF operation is implied by the UERANSIM test. The current RAN path is software-only.
 
 ## Gate 5 — IMS
