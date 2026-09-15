@@ -13,6 +13,13 @@ class SubscriberStatus(str, Enum):
     RETIRED = "RETIRED"
 
 
+class EsimStatus(str, Enum):
+    PLANNED = "PLANNED"
+    GENERATED = "GENERATED"
+    INSTALLED = "INSTALLED"
+    VERIFIED = "VERIFIED"
+
+
 class AssuranceStatus(str, Enum):
     AUTHORIZED = "AUTHORIZED"
     DENIED = "DENIED"
@@ -35,6 +42,8 @@ class Subscriber:
     secret_refs: Mapping[str, str]
     services: Mapping[str, bool]
     msisdn: str | None = None
+    profile_id: str | None = None
+    esim_status: EsimStatus = EsimStatus.PLANNED
 
     def __post_init__(self) -> None:
         if self.subscriber_id not in {f"700{i}" for i in range(1, 8)}:
@@ -53,6 +62,10 @@ class Subscriber:
             raise ValueError("status must be SubscriberStatus")
         if not self.secret_refs.get("authentication"):
             raise ValueError("authentication secret_ref is required")
+        if self.profile_id is not None and not self.profile_id.strip():
+            raise ValueError("profile_id must be non-empty when supplied")
+        if not isinstance(self.esim_status, EsimStatus):
+            raise ValueError("esim_status must be EsimStatus")
 
     def to_document(self) -> dict[str, Any]:
         return {
@@ -64,6 +77,8 @@ class Subscriber:
             "secret_refs": dict(self.secret_refs),
             "services": dict(self.services),
             "msisdn": self.msisdn,
+            "profile_id": self.profile_id,
+            "esim_status": self.esim_status.value,
         }
 
 
