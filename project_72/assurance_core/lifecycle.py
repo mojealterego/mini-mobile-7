@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
-from .models import EsimStatus, Subscriber, SubscriberStatus
+from .models import Subscriber, SubscriberStatus
 from .store import StoreConflictError, SubscriberRepository
 
 
@@ -45,7 +45,7 @@ def transition(subscriber: Subscriber, operation: str) -> Subscriber:
         services=subscriber.services,
         msisdn=subscriber.msisdn,
         profile_id=subscriber.profile_id,
-        esim_status=subscriber.esim_status if subscriber.esim_status is not EsimStatus.VERIFIED else EsimStatus.VERIFIED,
+        esim_status=subscriber.esim_status,
     )
 
 
