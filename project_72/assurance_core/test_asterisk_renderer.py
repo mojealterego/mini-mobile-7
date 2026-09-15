@@ -12,6 +12,16 @@ ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "scripts" / "project-72-render-asterisk-pjsip.sh"
 
 
+def run_renderer(output: Path, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["bash", str(SCRIPT), str(output)],
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
 class AsteriskRendererTests(unittest.TestCase):
     def _env(self) -> dict[str, str]:
         env = os.environ.copy()
@@ -22,13 +32,7 @@ class AsteriskRendererTests(unittest.TestCase):
     def test_renders_all_seven_endpoints_with_0600_permissions(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "pjsip.conf"
-            result = subprocess.run(
-                [str(SCRIPT), str(output)],
-                env=self._env(),
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_renderer(output, self._env())
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(stat.S_IMODE(output.stat().st_mode), 0o600)
             content = output.read_text(encoding="utf-8")
@@ -41,14 +45,7 @@ class AsteriskRendererTests(unittest.TestCase):
     def test_missing_password_fails_closed_and_writes_no_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "pjsip.conf"
-            env = os.environ.copy()
-            result = subprocess.run(
-                [str(SCRIPT), str(output)],
-                env=env,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_renderer(output, os.environ.copy())
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse(output.exists())
             self.assertIn("missing required secret environment variable", result.stderr)
@@ -58,13 +55,7 @@ class AsteriskRendererTests(unittest.TestCase):
         env["MM7_SIP_PASSWORD_7001"] = "unsafe;password"
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "pjsip.conf"
-            result = subprocess.run(
-                [str(SCRIPT), str(output)],
-                env=env,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            result = run_renderer(output, env)
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse(output.exists())
 
