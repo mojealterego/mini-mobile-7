@@ -1,4 +1,4 @@
-schema_version: "1.0.0"
+schema_version: "1.1.0"
 standard: JSON Schema Draft 2020-12
 schemas:
   subscriber: project-72/contracts/schemas/subscriber.schema.json
@@ -7,6 +7,8 @@ schemas:
   readback: project-72/contracts/schemas/readback.schema.json
   postcondition: project-72/contracts/schemas/postcondition.schema.json
   assurance_result: project-72/contracts/schemas/assurance-result.schema.json
+  private_identity: project-72/contracts/schemas/private-identity.schema.json
+  esim_activation_artifact: project-72/contracts/schemas/esim-activation-artifact.schema.json
 statuses:
   verified: VERIFIED
   executed_only: EXECUTED
@@ -14,3 +16,4 @@ statuses:
   stale_projection: STALE
   optimistic_lock_conflict: CONFLICT
   detected_drift: DRIFT
+  esim_artifact_generated: GENERATED
