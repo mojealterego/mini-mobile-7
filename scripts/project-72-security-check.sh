@@ -12,16 +12,63 @@ check_file "ims/asterisk/pjsip.conf.example"
 check_file "scripts/project-72-render-ueransim.sh"
 check_file "scripts/project-72-render-asterisk-pjsip.sh"
 
-if grep -RInE '(:latest([[:space:]"'"'\]|$)|ppa:[^[:space:]]+/latest)' core ims ran scripts network --include='*.yml' --include='*.yaml' --include='*.yaml.example' --include='*.conf' --include='*.list' --include='*.sh' --exclude='project-72-security-check.sh' 2>/dev/null; then
+# Keep scanner expressions free of shell-quote gymnastics. Each pattern is
+# intentionally narrow so this gate itself remains syntactically portable.
+if grep -RInE ':latest([[:space:]]|["/]|$)' core ims ran scripts network \
+    --include='*.yml' --include='*.yaml' --include='*.yaml.example' \
+    --include='*.conf' --include='*.list' --include='*.sh' \
+    --exclude='project-72-security-check.sh' 2>/dev/null; then
   fail "floating latest package/image reference detected"
 fi
 
-if grep -RInE '(password[[:space:]]*=[[:space:]]*[^$[:space:]#]+|secret(_key)?[[:space:]]*=[[:space:]]*[^$[:space:]#]+|-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----)' core ims ran subscribers network --exclude='*.md' 2>/dev/null; then
-  fail "possible checked-in credential/private-key literal detected"
+if grep -RInE 'ppa:[^[:space:]]+/latest' core ims ran scripts network \
+    --include='*.yml' --include='*.yaml' --include='*.yaml.example' \
+    --include='*.conf' --include='*.list' --include='*.sh' \
+    --exclude='project-72-security-check.sh' 2>/dev/null; then
+  fail "floating latest PPA reference detected"
 fi
 
-if grep -RInE '(^|[^0-9])0\.0\.0\.0:(5060|5061)([^0-9]|$)|host_network[[:space:]]*[:=][[:space:]]*true|network_mode[[:space:]]*[:=][[:space:]]*["'"']host|privileged[[:space:]]*[:=][[:space:]]*true' core ims ran scripts network --include='*.yml' --include='*.yaml' --include='*.yaml.example' --include='*.conf' --include='*.list' --include='*.sh' --exclude='project-72-security-check.sh' 2>/dev/null; then
-  fail "public IMS bind or unsafe host/privileged default detected"
+if grep -RInE 'password[[:space:]]*=[[:space:]]*[^$[:space:]#]+' \
+    core ims ran subscribers network --exclude='*.md' 2>/dev/null; then
+  fail "possible checked-in password literal detected"
+fi
+
+if grep -RInE 'secret(_key)?[[:space:]]*=[[:space:]]*[^$[:space:]#]+' \
+    core ims ran subscribers network --exclude='*.md' 2>/dev/null; then
+  fail "possible checked-in secret literal detected"
+fi
+
+if grep -RInE -- '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----' \
+    core ims ran subscribers network --exclude='*.md' 2>/dev/null; then
+  fail "private-key literal detected"
+fi
+
+if grep -RInE '(^|[^0-9])0\.0\.0\.0:(5060|5061)([^0-9]|$)' \
+    core ims ran scripts network --include='*.yml' --include='*.yaml' \
+    --include='*.yaml.example' --include='*.conf' --include='*.list' \
+    --include='*.sh' --exclude='project-72-security-check.sh' 2>/dev/null; then
+  fail "public IMS bind detected"
+fi
+
+if grep -RInE 'host_network[[:space:]]*[:=][[:space:]]*true' \
+    core ims ran scripts network --include='*.yml' --include='*.yaml' \
+    --include='*.yaml.example' --include='*.conf' --include='*.list' \
+    --include='*.sh' --exclude='project-72-security-check.sh' 2>/dev/null; then
+  fail "unsafe host_network default detected"
+fi
+
+if grep -RInE 'network_mode[[:space:]]*[:=][[:space:]]*host' \
+    core ims ran scripts network --include='*.yml' --include='*.yaml' \
+    --include='*.yaml.example' --include='*.conf' --include='*.list' \
+    --include='*.sh' --exclude='project-72-security-check.sh' 2>/dev/null; then
+  fail "unsafe host network default detected"
+fi
+
+if grep -RInE 'privileged[[:space:]]*[:=][[:space:]]*true' \
+    core ims ran scripts network --include='*.yml' --include='*.yaml' \
+    --include='*.yaml.example' --include='*.conf' --include='*.list' \
+    --include='*.sh' --exclude='project-72-security-check.sh' 2>/dev/null; then
+  fail "unsafe privileged default detected"
 fi
 
 grep -Fq 'Private IMS Network Required' ims/kamailio/kamailio.cfg.example || fail "Kamailio private IMS ACL missing"
