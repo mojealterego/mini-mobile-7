@@ -1,4 +1,4 @@
-.PHONY: help validate bootstrap-ubuntu22 build-ueransim assurance-test preflight render-ueransim render-asterisk provision-seven host-evidence generate-identities generate-esim ims-config-check security-check metrics-test
+.PHONY: help validate bootstrap-ubuntu22 build-ueransim assurance-test preflight runtime-capabilities render-ueransim render-asterisk provision-seven host-evidence generate-identities generate-esim ims-config-check security-check metrics-test
 
 help:
 	@echo "MINI-MOBILE-7 commands:"
@@ -7,6 +7,7 @@ help:
 	@echo "  make build-ueransim   - build pinned UERANSIM"
 	@echo "  make assurance-test   - run Project-72 assurance and integration tests"
 	@echo "  make preflight        - run the Project-72 runtime safety gate"
+	@echo "  make runtime-capabilities - inspect systemd/kernel/device capabilities without mutation"
 	@echo "  make render-ueransim  - render deployment-local UE configs from external secrets"
 	@echo "  make render-asterisk  - render deployment-local seven-subscriber PJSIP endpoints from external secrets"
 	@echo "  make ims-config-check - run the static private IMS safety gate"
@@ -44,6 +45,9 @@ assurance-test:
 
 preflight:
 	bash scripts/project-72-preflight.sh
+
+runtime-capabilities:
+	bash scripts/project-72-runtime-capabilities.sh
 
 render-ueransim:
 	bash scripts/project-72-render-ueransim.sh
