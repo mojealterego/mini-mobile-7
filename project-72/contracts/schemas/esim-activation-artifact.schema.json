@@ -4,12 +4,13 @@
   "title": "MINI-MOBILE-7 eSIM Activation Artifact",
   "type": "object",
   "additionalProperties": false,
-  "required": ["subscriber_id", "profile_id", "smdp_address", "activation_code_ref", "activation_uri_sha256", "status"],
+  "required": ["subscriber_id", "profile_id", "smdp_address", "activation_code_ref", "activation_uri", "activation_uri_sha256", "status"],
   "properties": {
     "subscriber_id": {"type": "string", "pattern": "^700[1-7]$"},
     "profile_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]{3,128}$"},
-    "smdp_address": {"type": "string", "minLength": 1},
+    "smdp_address": {"type": "string", "pattern": "^[A-Za-z0-9.-]{1,253}$"},
     "activation_code_ref": {"type": "string", "pattern": "^env://.+"},
+    "activation_uri": {"type": "string", "pattern": "^LPA:1\$[^$\s]+\$[^$\r\n]+$", "maxLength": 1024},
     "activation_uri_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
     "status": {"type": "string", "const": "GENERATED"}
   }
