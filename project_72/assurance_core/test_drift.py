@@ -83,6 +83,22 @@ class DriftDetectorTest(unittest.TestCase):
         self.assertEqual(report.state, DriftState.DRIFT)
         self.assertEqual(report.reason, "assurance marker subscriber mismatch")
 
+    def test_malformed_marker_version_is_fail_closed(self) -> None:
+        report = self.detector.compare(
+            self.subscriber,
+            self._readback(
+                details={
+                    "marker": {
+                        "subscriber_id": "7001",
+                        "canonical_version": "not-an-integer",
+                        "status": "ACTIVE",
+                    }
+                }
+            ),
+        )
+        self.assertEqual(report.state, DriftState.DRIFT)
+        self.assertEqual(report.reason, "assurance marker version mismatch")
+
     def test_missing_marker_is_fail_closed(self) -> None:
         report = self.detector.compare(self.subscriber, self._readback(details={"marker": None}))
         self.assertEqual(report.state, DriftState.DRIFT)
