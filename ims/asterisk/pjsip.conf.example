@@ -1,0 +1,46 @@
+; MINI-MOBILE-7 private IMS/Asterisk boundary template.
+; Deployment-only example. Certificates/keys are external runtime material.
+; No public PSTN trunk is configured.
+
+[global]
+type=global
+user_agent=MINI-MOBILE-7-Asterisk
+
+[transport-tls]
+type=transport
+protocol=tls
+bind=10.40.0.20:5061
+cert_file=/etc/asterisk/keys/mm7-asterisk.crt
+priv_key_file=/etc/asterisk/keys/mm7-asterisk.key
+ca_list_file=/etc/asterisk/keys/mm7-ca.crt
+verify_server=yes
+method=tlsv1_2
+
+[7001]
+type=aor
+max_contacts=1
+remove_existing=yes
+
+[7001]
+type=auth
+auth_type=userpass
+username=7001
+password=${MM7_SIP_PASSWORD_7001}
+
+[7001]
+type=endpoint
+aors=7001
+auth=7001
+transport=transport-tls
+context=mm7-internal
+direct_media=no
+disallow=all
+allow=alaw,ulaw
+media_encryption=sdes
+media_encryption_optimistic=no
+rewrite_contact=no
+rtp_symmetric=no
+force_rport=no
+
+; Repeat the endpoint/AOR/auth pattern for 7002-7007 only after their
+; canonical subscriber records and IMS authorization are VERIFIED.

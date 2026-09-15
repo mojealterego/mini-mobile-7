@@ -1,0 +1,86 @@
+#!KAMAILIO
+# MINI-MOBILE-7 IMS boundary template.
+# Deployment-only example: bind only to the private IMS network.
+# Do not expose SIP to the public Internet.
+
+#!define IMS_NET "10.40.0.0/24"
+#!define ASTERISK_IP "10.40.0.20"
+
+#### Core modules ####
+loadmodule "sl.so"
+loadmodule "tm.so"
+loadmodule "rr.so"
+loadmodule "maxfwd.so"
+loadmodule "textops.so"
+loadmodule "sanity.so"
+loadmodule "xlog.so"
+loadmodule "tls.so"
+loadmodule "dispatcher.so"
+
+modparam("rr", "enable_full_lr", 1)
+modparam("dispatcher", "list_file", "/etc/kamailio/dispatcher.list")
+
+request_route {
+    if (!mf_process_maxfwd_header("10")) {
+        sl_send_reply("483", "Too Many Hops");
+        exit;
+    }
+
+    if (!sanity_check("1511", "7")) {
+        xlog("L_WARN", "MM7 IMS sanity check failed from $si:$sp\n");
+        exit;
+    }
+
+    # Fail closed for traffic arriving from outside the private IMS segment.
+    if ($si !~ "^10\\.40\\.0\\.") {
+        sl_send_reply("403", "Private IMS Network Required");
+        exit;
+    }
+
+    if (is_method("CANCEL")) {
+        if (t_check_trans()) t_relay();
+        exit;
+    }
+
+    if (is_method("OPTIONS")) {
+        sl_send_reply("200", "OK");
+        exit;
+    }
+
+    # REGISTER is relayed to the controlled Asterisk registrar. Registration
+    # remains limited to the private IMS network and must be correlated with
+    # canonical subscriber authorization at the application boundary.
+    if (is_method("REGISTER")) {
+        if (!ds_select_dst("1", "4")) {
+            sl_send_reply("503", "IMS Registrar Unavailable");
+            exit;
+        }
+        route(RELAY);
+        exit;
+    }
+
+    # Keep routing deterministic: Kamailio is the IMS SIP control-plane proxy;
+    # Asterisk is the controlled service/media endpoint.
+    if (is_method("INVITE|MESSAGE|BYE|ACK|UPDATE|PRACK|INFO|NOTIFY|SUBSCRIBE")) {
+        record_route();
+        if (!ds_select_dst("1", "4")) {
+            sl_send_reply("503", "IMS Service Unavailable");
+            exit;
+        }
+        route(RELAY);
+        exit;
+    }
+
+    sl_send_reply("405", "Method Not Allowed");
+}
+
+route[RELAY] {
+    if (!t_relay()) {
+        sl_reply_error();
+    }
+    exit;
+}
+
+failure_route[MANAGE_FAILURE] {
+    if (t_is_canceled()) exit;
+}

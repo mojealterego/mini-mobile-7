@@ -1,0 +1,73 @@
+name: Project-72 tests
+
+on:
+  push:
+    branches:
+      - main
+      - project-72/phase-2a
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  assurance-tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run Project-72 assurance tests
+        run: make assurance-test
+      - name: Validate metrics exporter
+        run: make metrics-test
+      - name: Validate IMS configuration boundary
+        run: make ims-config-check
+      - name: Validate security and isolation boundary
+        run: make security-check
+      - name: Validate UERANSIM renderer
+        env:
+          MM7_SECRET_MINI_MOBILE_7_7001: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
+          MM7_SECRET_MINI_MOBILE_7_7002: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
+          MM7_SECRET_MINI_MOBILE_7_7003: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
+          MM7_SECRET_MINI_MOBILE_7_7004: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
+          MM7_SECRET_MINI_MOBILE_7_7005: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
+          MM7_SECRET_MINI_MOBILE_7_7006: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
+          MM7_SECRET_MINI_MOBILE_7_7007: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
+        run: |
+          bash -n scripts/project-72-render-ueransim.sh
+          PYTHONPATH=. python3 -m unittest project_72.assurance_core.test_ueransim_renderer -v
+          bash scripts/project-72-render-ueransim.sh /tmp/mm7-ueransim
+          test "$(find /tmp/mm7-ueransim -maxdepth 1 -type f -name 'ue-*.yaml' | wc -l)" -eq 7
+          for config in /tmp/mm7-ueransim/ue-*.yaml; do
+            test "$(stat -c '%a' "$config")" -eq 600
+          done
+          grep -q "supi: 'imsi-001010000000001'" /tmp/mm7-ueransim/ue-7001.yaml
+          grep -q "supi: 'imsi-001010000000007'" /tmp/mm7-ueransim/ue-7007.yaml
+          grep -q "apn: internet" /tmp/mm7-ueransim/ue-7001.yaml
+          grep -q "gnbSearchList:" /tmp/mm7-ueransim/ue-7001.yaml
+      - name: Validate Asterisk PJSIP renderer
+        env:
+          MM7_SIP_PASSWORD_7001: synthetic-ci-password-7001
+          MM7_SIP_PASSWORD_7002: synthetic-ci-password-7002
+          MM7_SIP_PASSWORD_7003: synthetic-ci-password-7003
+          MM7_SIP_PASSWORD_7004: synthetic-ci-password-7004
+          MM7_SIP_PASSWORD_7005: synthetic-ci-password-7005
+          MM7_SIP_PASSWORD_7006: synthetic-ci-password-7006
+          MM7_SIP_PASSWORD_7007: synthetic-ci-password-7007
+        run: |
+          bash -n scripts/project-72-render-asterisk-pjsip.sh
+          PYTHONPATH=. python3 -m unittest project_72.assurance_core.test_asterisk_renderer -v
+          bash scripts/project-72-render-asterisk-pjsip.sh /tmp/mm7-pjsip.conf
+          test "$(stat -c '%a' /tmp/mm7-pjsip.conf)" -eq 600
+          test "$(grep -c '^type=aor$' /tmp/mm7-pjsip.conf)" -eq 7
+          test "$(grep -c '^type=auth$' /tmp/mm7-pjsip.conf)" -eq 7
+          test "$(grep -c '^type=endpoint$' /tmp/mm7-pjsip.conf)" -eq 7
+          grep -q '^bind=10.40.0.20:5061$' /tmp/mm7-pjsip.conf
+          grep -q '^media_encryption=sdes$' /tmp/mm7-pjsip.conf
+          ! grep -q 'password=.*[;[:space:]]' /tmp/mm7-pjsip.conf

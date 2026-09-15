@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-mobile-7.local/project-72/schemas/assurance-result.schema.json",
+  "title": "Project-72 Assurance Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "target", "status", "authorization", "policy", "execution", "readback", "postcondition"],
+  "properties": {
+    "request_id": {"type": "string", "minLength": 8},
+    "target": {"type": "string", "pattern": "^700[1-7]$"},
+    "status": {"type": "string", "enum": ["AUTHORIZED", "DENIED", "EXECUTED", "VERIFIED", "UNVERIFIED", "STALE", "CONFLICT", "DRIFT", "FAILED"]},
+    "authorization": {"type": "boolean"},
+    "policy": {"type": "boolean"},
+    "execution": {"type": "boolean"},
+    "readback": {"type": "boolean"},
+    "postcondition": {"type": "boolean"},
+    "reason": {"type": "string"},
+    "observed_version": {"type": "integer", "minimum": 1}
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-mobile-7.local/project-72/schemas/private-identity.schema.json",
+  "title": "MINI-MOBILE-7 Private Subscriber Identity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["subscriber_id", "extension", "sip_uri", "tel_uri"],
+  "properties": {
+    "subscriber_id": {"type": "string", "pattern": "^700[1-7]$"},
+    "extension": {"type": "string", "pattern": "^700[1-7]$"},
+    "sip_uri": {"type": "string", "pattern": "^sip:700[1-7]@[^\\s]+$"},
+    "tel_uri": {"type": "string", "pattern": "^tel:700[1-7]$"}
+  }
+}
