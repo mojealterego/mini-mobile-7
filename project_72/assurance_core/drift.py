@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Mapping
 
 from .models import AuthoritativeReadback, Subscriber
 
@@ -22,21 +23,15 @@ class DriftReport:
 
 
 class DriftDetector:
-    """Compare desired canonical state with authoritative runtime readback.
+    """Compare canonical intent with authoritative runtime readback.
 
     Detection is deliberately side-effect free. It never repairs a projection.
-    Repair requires a separate authorized capability and an assurance cycle.
+    Repair requires a separate authorized capability and a complete assurance cycle.
     """
 
     def compare(self, subscriber: Subscriber, readback: AuthoritativeReadback) -> DriftReport:
         if readback.target != subscriber.subscriber_id:
-            return DriftReport(
-                subscriber.subscriber_id,
-                DriftState.DRIFT,
-                subscriber.version,
-                readback.observed_version,
-                "readback target does not match canonical subscriber",
-            )
+            return self._drift(subscriber, readback, "readback target does not match canonical subscriber")
 
         if readback.state == "ABSENT":
             return DriftReport(
@@ -47,35 +42,39 @@ class DriftDetector:
                 "Open5GS projection is absent",
             )
 
-        if readback.state != "ACTIVE":
-            return DriftReport(
-                subscriber.subscriber_id,
-                DriftState.DRIFT,
-                subscriber.version,
-                readback.observed_version,
-                f"authoritative state is {readback.state}",
+        if readback.state != subscriber.status.value:
+            return self._drift(
+                subscriber,
+                readback,
+                f"authoritative state is {readback.state}; canonical state is {subscriber.status.value}",
             )
 
         if readback.observed_version != subscriber.version:
-            return DriftReport(
-                subscriber.subscriber_id,
-                DriftState.DRIFT,
-                subscriber.version,
-                readback.observed_version,
-                "canonical and runtime versions differ",
-            )
+            return self._drift(subscriber, readback, "canonical and runtime versions differ")
 
-        services = readback.details.get("services")
-        if isinstance(services, dict):
-            for name in ("data", "ims"):
-                if bool(services.get(name, False)) != bool(subscriber.services.get(name, False)):
-                    return DriftReport(
-                        subscriber.subscriber_id,
-                        DriftState.DRIFT,
-                        subscriber.version,
-                        readback.observed_version,
-                        f"service projection mismatch: {name}",
-                    )
+        details = readback.details
+        if details.get("imsi") != subscriber.imsi:
+            return self._drift(subscriber, readback, "IMSI projection mismatch")
+
+        if details.get("ue_ip") != subscriber.ue_ip:
+            return self._drift(subscriber, readback, "UE IP projection mismatch")
+
+        marker = details.get("marker")
+        if not isinstance(marker, Mapping):
+            return self._drift(subscriber, readback, "authoritative assurance marker is missing")
+        if marker.get("subscriber_id") != subscriber.subscriber_id:
+            return self._drift(subscriber, readback, "assurance marker subscriber mismatch")
+        if int(marker.get("canonical_version", -1)) != subscriber.version:
+            return self._drift(subscriber, readback, "assurance marker version mismatch")
+        if marker.get("status") != subscriber.status.value:
+            return self._drift(subscriber, readback, "assurance marker lifecycle mismatch")
+
+        services = details.get("services")
+        if not isinstance(services, Mapping):
+            return self._drift(subscriber, readback, "authoritative service projection is missing")
+        for name in ("data", "ims"):
+            if bool(services.get(name, False)) != bool(subscriber.services.get(name, False)):
+                return self._drift(subscriber, readback, f"service projection mismatch: {name}")
 
         return DriftReport(
             subscriber.subscriber_id,
@@ -83,4 +82,14 @@ class DriftDetector:
             subscriber.version,
             readback.observed_version,
             "canonical and runtime state are synchronized",
+        )
+
+    @staticmethod
+    def _drift(subscriber: Subscriber, readback: AuthoritativeReadback, reason: str) -> DriftReport:
+        return DriftReport(
+            subscriber.subscriber_id,
+            DriftState.DRIFT,
+            subscriber.version,
+            readback.observed_version,
+            reason,
         )
