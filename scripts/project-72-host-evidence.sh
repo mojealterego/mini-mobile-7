@@ -35,10 +35,10 @@ write_cmd forwarding sysctl net.ipv4.ip_forward
 write_cmd firewall iptables -S
 write_cmd listening-sockets ss -lntup
 
-if [[ -x scripts/project-72-runtime-capabilities.sh ]]; then
-  scripts/project-72-runtime-capabilities.sh >"$OUT_DIR/runtime-capabilities.txt" 2>&1 || true
+if [[ -f scripts/project-72-runtime-capabilities.sh ]]; then
+  bash scripts/project-72-runtime-capabilities.sh >"$OUT_DIR/runtime-capabilities.txt" 2>&1 || true
 else
-  printf '%s\n' 'UNAVAILABLE: scripts/project-72-runtime-capabilities.sh is not executable' >"$OUT_DIR/runtime-capabilities.txt"
+  printf '%s\n' 'UNAVAILABLE: scripts/project-72-runtime-capabilities.sh is missing' >"$OUT_DIR/runtime-capabilities.txt"
 fi
 
 for service in mongod open5gs-amfd open5gs-smfd open5gs-upfd kamailio asterisk; do
