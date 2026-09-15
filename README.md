@@ -61,12 +61,19 @@ make assurance-test
 make ims-config-check
 make security-check
 make metrics-test
+make runtime-capabilities
 make preflight
 make provision-seven
 make host-evidence
 ```
 
-`security-check` is a static source/configuration gate. `host-evidence` is read-only and captures deployment evidence. Neither substitutes for live host acceptance.
+`security-check` is a static source/configuration gate. `runtime-capabilities` is a read-only diagnostic for systemd/kernel/device/network capabilities. `host-evidence` is read-only and captures deployment evidence. None of these substitutes for live host acceptance.
+
+## Runtime environment boundary
+
+The live Project-72 runtime requires a real Linux host or VM with the required kernel/network privileges and systemd service supervision. A 22.04 userland inside Termux/proot can be used for development and ARM64 compilation, but it is not treated as a compliant live Open5GS host when systemd, network administration, TUN, firewall or required kernel interfaces are unavailable.
+
+Run `make runtime-capabilities` first on a candidate host. Then run `make preflight`. The preflight gate must remain fail-closed; do not bypass it to force provisioning in a restricted container or userland environment.
 
 ## Monitoring
 
@@ -112,7 +119,9 @@ docs/                   Architecture, deployment, recovery, legal and status not
 
 ## Validation status
 
-Workflow **#358** for commit `e15bdc4b555394cade7bb469cc1914c127e494fe` completed successfully on Ubuntu 22.04 and passed the Project-72 assurance suite, metrics exporter, IMS static safety gate, security/isolation gate, UERANSIM renderer and Asterisk PJSIP renderer. Subsequent commits harden host-evidence/systemd handling and runtime-preflight diagnostics; those changes require the next CI run.
+Workflow **#369** on `project-72/phase-2a` completed successfully after the latest documentation/runtime-diagnostic changes. The Ubuntu 22.04 CI job passed the Project-72 assurance suite, metrics exporter, IMS static safety gate, security/isolation gate, UERANSIM renderer and Asterisk PJSIP renderer.
+
+The branch also contains a read-only runtime capability diagnostic and a systemd-aware host evidence collector. These tools intentionally expose restricted environments instead of weakening the runtime gate.
 
 CI/source tests do not prove live Open5GS deployment, UERANSIM attachment, UE Internet, IMS TLS/SRTP calls, eSIM installation, physical RAN operation or lawful spectrum use.
 
