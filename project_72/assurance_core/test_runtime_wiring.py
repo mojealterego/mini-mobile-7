@@ -43,6 +43,15 @@ class RuntimeProvisionerWiringTest(TestCase):
         self.assertIn('env["MM7_MONGODB_URI"] = mongodb_uri', source)
         self.assertIn('env["MM7_IDEMPOTENCY_DB_URI"] = idempotency_uri', source)
 
+    def test_dry_run_is_before_runtime_dependencies_and_mutation(self) -> None:
+        source = self._source()
+        dry_run = source.index('if not args.execute:')
+        mutation_gate = source.index('return provision_execute(', dry_run)
+        self.assertLess(dry_run, mutation_gate)
+        self.assertIn('print("DRY-RUN: no MongoDB/Open5GS mutation performed")', source)
+        self.assertNotIn('make_core(args.mongodb_uri', source)
+        self.assertNotIn('make_core(', source[dry_run:dry_run + 1_000])
+
     def test_active_readback_uses_subscriber_id(self) -> None:
         source = self._source()
         self.assertIn("adapter.readback(current.subscriber_id)", source)
