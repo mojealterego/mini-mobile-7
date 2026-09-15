@@ -26,7 +26,7 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | Metrics exporter | TESTED IN CI | Dependency-free bounded Prometheus text exporter over evidence snapshots; no telecom mutation or secret labels |
 | Backup/recovery procedure | IMPLEMENTED | Canonical/idempotency/eSIM metadata backup with restricted files, checksums and isolated restore acceptance procedure; backup execution remains host-only |
 | IMS external reference audit | COMPLETE | PJSIP archive, Pixel IMS module and GSM-SIP bridge audited; decisions recorded in `docs/ims-external-reference-2026-09-15.md` |
-| CI validation | PASS-CI | Workflow #358 succeeded on `project-72/phase-2a`; all workflow steps passed |
+| CI validation | PASS-CI | Workflow #385 succeeded on `project-72/phase-2a`; all workflow steps passed |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation; systemd is mandatory for service-state verification |
 | Runtime provisioner | IMPLEMENTED IN CODE | `--execute` requires durable MongoDB idempotency URI and injects `MongoIdempotencyStore` into AssuranceCore |
 | Runtime dry-run boundary | IMPLEMENTED IN CODE | Dry-run exits before runtime database construction or mutation path |
@@ -43,13 +43,13 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 
 `scripts/project-72-security-check.sh` is a source-level gate. It rejects floating deployment versions, obvious checked-in credentials/private keys, public SIP binds and unsafe host-network/privileged defaults in controlled configuration. It also verifies the private IMS ACL, private TLS dispatcher and Asterisk media isolation baseline.
 
-The scanner was hardened so its own shell quoting is syntax-safe and it does not self-match. Workflow #358 confirmed the complete CI gate after the malformed-marker and backup hardening commits that preceded it.
+The scanner was hardened so its own shell quoting is syntax-safe and it does not self-match. Workflow #385 confirmed the complete CI gate after the malformed-marker and backup hardening commits that preceded it.
 
 This is deliberately not a substitute for host firewall, systemd, container, filesystem or network evidence. Those remain Gate 7 host acceptance items.
 
 ## Monitoring boundary
 
-`monitoring/project_72_metrics.py` provides a deterministic, dependency-free Prometheus text exporter over an already collected evidence snapshot. Labels are bounded to assurance status and subscriber IDs 7001–7007. IMSI, UE IP, authentication material, private keys and activation material are excluded from metrics. The exporter is read-only and does not create assurance state. Its tests pass in workflow #358.
+`monitoring/project_72_metrics.py` provides a deterministic, dependency-free Prometheus text exporter over an already collected evidence snapshot. Labels are bounded to assurance status and subscriber IDs 7001–7007. IMSI, UE IP, authentication material, private keys and activation material are excluded from metrics. The exporter is read-only and does not create assurance state. Its tests pass in workflow #385.
 
 ## Backup/recovery boundary
 
@@ -63,7 +63,7 @@ The current test environment is an Ubuntu 22.04 userland reached through `proot-
 
 ## Validation note
 
-Workflow #358 completed successfully for commit `e15bdc4b555394cade7bb469cc1914c127e494fe`. The Ubuntu 22.04 CI job passed the Project-72 assurance suite, metrics exporter, IMS static safety gate, security/isolation gate, UERANSIM renderer and Asterisk PJSIP renderer.
+Workflow #385 completed successfully for commit `47bafba3d95124e369e15951faf767434d0ff043`. The Ubuntu 22.04 CI job passed the Project-72 assurance suite, runtime capability gate tests, metrics exporter, IMS static safety gate, security/isolation gate, UERANSIM renderer and Asterisk PJSIP renderer.
 
 CI validates deterministic source-level behavior only. No live Open5GS deployment, UE attach, RAN session, IMS call or public telephony interconnect has been claimed.
 
