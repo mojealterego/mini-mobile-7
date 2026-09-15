@@ -174,6 +174,22 @@ class Open5GSAssuranceIntegrationTest(unittest.TestCase):
         self.assertEqual(result.status, AssuranceStatus.DRIFT)
         self.assertEqual(result.observed_version, 2)
 
+    def test_malformed_projection_marker_is_drift_not_exception(self) -> None:
+        projection_repository = make_repository()
+        collection = FakeCollection()
+        projection_adapter = Open5GSAdapter(projection_repository, collection, FakeSecrets())
+        projection_adapter.execute(make_request())
+        assert collection.document is not None
+        marker = collection.document["mm7_assurance"]
+        assert isinstance(marker, dict)
+        marker["canonical_version"] = "not-an-integer"
+
+        readback_adapter = Open5GSAdapter(projection_repository, collection, FakeSecrets())
+        readback = readback_adapter.readback("7001")
+
+        self.assertEqual(readback.observed_version, 0)
+        self.assertEqual(readback.state, "MISMATCH")
+
 
 if __name__ == "__main__":
     unittest.main()
