@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from threading import Lock
 from typing import Any, Mapping
 
-from .models import Subscriber, SubscriberStatus
+from .models import EsimStatus, Subscriber, SubscriberStatus
 
 
 class StoreConflictError(RuntimeError):
@@ -148,12 +148,15 @@ def _same_canonical_record(left: Subscriber, right: Subscriber) -> bool:
         and left.secret_refs == right.secret_refs
         and left.services == right.services
         and left.msisdn == right.msisdn
+        and left.profile_id == right.profile_id
+        and left.esim_status is right.esim_status
     )
 
 
 def _from_document(document: Mapping[str, Any]) -> Subscriber:
     try:
         status = SubscriberStatus(str(document["status"]))
+        esim_status = EsimStatus(str(document.get("esim_status", EsimStatus.PLANNED.value)))
     except (KeyError, ValueError) as exc:
         raise ValueError("canonical subscriber contains an invalid status") from exc
     return Subscriber(
@@ -165,4 +168,6 @@ def _from_document(document: Mapping[str, Any]) -> Subscriber:
         secret_refs=dict(document["secret_refs"]),
         services=dict(document["services"]),
         msisdn=document.get("msisdn"),
+        profile_id=document.get("profile_id"),
+        esim_status=esim_status,
     )
