@@ -1,4 +1,4 @@
-.PHONY: help validate bootstrap-ubuntu22 build-ueransim assurance-test preflight render-ueransim render-asterisk provision-seven host-evidence generate-identities generate-esim
+.PHONY: help validate bootstrap-ubuntu22 build-ueransim assurance-test preflight render-ueransim render-asterisk provision-seven host-evidence generate-identities generate-esim ims-config-check
 
 help:
 	@echo "MINI-MOBILE-7 commands:"
@@ -9,6 +9,7 @@ help:
 	@echo "  make preflight        - run the Project-72 runtime safety gate"
 	@echo "  make render-ueransim  - render deployment-local UE configs from external secrets"
 	@echo "  make render-asterisk  - render deployment-local seven-subscriber PJSIP endpoints from external secrets"
+	@echo "  make ims-config-check - run the static private IMS safety gate"
 	@echo "  make provision-seven   - dry-run seven-subscriber runtime provisioning"
 	@echo "  make host-evidence    - collect read-only host acceptance evidence"
 	@echo "  make generate-identities - print deterministic private identities 7001-7007"
@@ -47,6 +48,9 @@ render-ueransim:
 
 render-asterisk:
 	bash scripts/project-72-render-asterisk-pjsip.sh
+
+ims-config-check:
+	bash scripts/project-72-ims-config-check.sh
 
 provision-seven:
 	PYTHONPATH=. python3 scripts/project-72-provision-seven.py
