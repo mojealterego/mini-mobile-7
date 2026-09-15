@@ -22,43 +22,56 @@ The test was hardened after review because the first version could permit either
 
 Added `project_72/assurance_core/test_ueransim_renderer.py` and wired it into `make assurance-test` and CI.
 
-The renderer suite now verifies:
+The renderer suite verifies all seven outputs, deterministic subscriber/IMSI mapping, lab PLMN/APN/gNB settings, `0600` permissions, missing-secret rejection, malformed authentication-material rejection, cleanup of failed partial output and absence of direct authentication literals in the renderer source.
 
-- all seven `7001`-`7007` outputs are produced;
-- deterministic subscriber/IMSI mapping remains aligned with the seven-UE catalog;
-- the lab PLMN, APN and gNB search address are present;
-- generated runtime configuration permissions are exactly `0600`;
-- a missing external authentication reference fails closed and leaves no output for the failed subscriber;
-- malformed authentication material is rejected and its partial output is removed;
-- the renderer source contains no direct authentication literals.
+CI uses synthetic non-production authentication values only.
 
-CI continues to use synthetic non-production authentication material only.
+### 3. Runtime dry-run and preflight hardening
 
-### 3. CI verification
+Added regression coverage confirming that runtime dry-run exits before construction of the MongoDB/Open5GS mutation path. Runtime `--execute` remains fail-closed without a durable idempotency URI and invokes preflight before provisioning mutation.
 
-GitHub Actions run #165 for commit `5e982e6c554894514c17d4781eb3acf675ae4299` completed with `success`. Both the full Project-72 assurance test target and the dedicated UERANSIM renderer validation step passed.
+### 4. Read-only host evidence boundary
 
-This supersedes the earlier pending state from run #154. The corrected concurrent-idempotency behavior and renderer hardening are now CI-green on the current branch head.
+Added `scripts/project-72-host-evidence.sh` and a `make host-evidence` target. The collector records OS/kernel, IP addressing/routes, `ogstun`, IPv4 forwarding, firewall rules, listening sockets, relevant service status, MongoDB version when available, running services and hashes/permissions of deployment-local UERANSIM files. It uses `umask 077` and intentionally does not collect authentication material or mutate telecom state.
 
-### 4. Gate 4E preparation review
+Updated `docs/runtime-acceptance.md` to make this collector part of the Gate 4E evidence procedure.
 
-The current UERANSIM renderer and runtime acceptance boundary remain deployment-local. Gate 4E is still a host-runtime task: start the pinned Open5GS/AMF path, start the UERANSIM gNB, attach one UE at a time, validate PDU session establishment and compare authoritative runtime state with canonical state.
+### 5. CI status
 
-No host execution was claimed because no live Open5GS/UERANSIM target is available through this repository session.
+Run #165 for commit `5e982e6c554894514c17d4781eb3acf675ae4299` completed successfully before the latest runtime/documentation commits. It passed both the Project-72 assurance suite and UERANSIM renderer validation.
+
+The current branch head `4674229cbab42a822a9acc2ce14de3daac2133e6` has a newer Project-72 workflow run #177 queued. The latest commit therefore remains **CI PENDING** until that workflow completes.
 
 ## Current engineering boundary
 
-The following remain code-complete but require host acceptance:
+Code and deterministic tests cover:
 
-- MongoDB canonical store against the deployment database;
-- durable MongoDB idempotency store against the deployment database;
-- Open5GS v2.8.0 live projection/readback;
-- UERANSIM attach/session validation;
-- IMS registration/call validation;
+- Project-72 contracts;
+- canonical subscriber repository;
+- capability authorization;
+- assurance execution/readback/postcondition chain;
+- optimistic concurrency;
+- durable idempotency semantics and concurrent duplicate fail-closed behavior;
+- Open5GS v2.8.0 projection/readback adapter;
+- seven-subscriber deterministic projection tests;
+- UERANSIM seven-UE rendering and validation;
+- runtime preflight and dry-run safety boundary;
+- read-only host evidence capture;
+- private IMS scaffolding.
+
+The following still require the actual controlled deployment host:
+
+- MongoDB canonical/idempotency database acceptance;
+- Open5GS v2.8.0 live projection and authoritative readback;
+- UERANSIM gNB/UE attach and PDU-session validation for 7001–7007;
+- UE Internet path validation;
+- Kamailio/Asterisk TLS/SRTP registration and internal call validation;
+- live drift injection/readback acceptance;
+- final security/isolation evidence;
 - physical RAN and handset validation.
 
 No live telecom state is claimed from CI-only validation.
 
 ## Safety boundary
 
-No production authentication secrets are stored in this log or in the repository. The renderer CI uses synthetic non-production authentication values only. Physical RF operation remains gated on appropriate hardware and lawful Polish radio authorization.
+No production authentication secrets are stored in the repository or this log. Physical RF operation remains gated on suitable hardware and lawful Polish radio authorization. Public PSTN/PLMN interconnection remains outside the default private-lab path.
