@@ -35,8 +35,10 @@ jobs:
           MM7_SECRET_MINI_MOBILE_7_7007: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
         run: |
           bash -n scripts/project-72-render-ueransim.sh
+          PYTHONPATH=. python3 -m unittest project_72.assurance_core.test_ueransim_renderer -v
           bash scripts/project-72-render-ueransim.sh /tmp/mm7-ueransim
           test "$(find /tmp/mm7-ueransim -maxdepth 1 -type f -name 'ue-*.yaml' | wc -l)" -eq 7
+          test "$(find /tmp/mm7-ueransim -maxdepth 1 -type f -name 'ue-*.yaml' -perm 077 -o -perm 007 -o -perm 002 | wc -l)" -eq 0
           grep -q "supi: 'imsi-001010000000001'" /tmp/mm7-ueransim/ue-7001.yaml
           grep -q "supi: 'imsi-001010000000007'" /tmp/mm7-ueransim/ue-7007.yaml
           grep -q "apn: internet" /tmp/mm7-ueransim/ue-7001.yaml
