@@ -70,21 +70,25 @@ Simplified lifecycle transition state preservation while retaining immutable can
 
 Added `scripts/project-72-security-check.sh`. The gate rejects floating deployment versions, obvious checked-in credentials/private keys, public IMS SIP binds and unsafe host-network/privileged defaults. It also verifies the private IMS ACL, private TLS dispatcher and Asterisk media-isolation baseline.
 
-This is a source-level gate only; host firewall, systemd/container privileges and actual network exposure require host evidence.
+The first CI attempt exposed a shell-quoting syntax defect in the scanner itself. The scanner was rewritten with simpler independent expressions and exclusion of its own file. Workflow #347 then completed successfully, including the security gate.
 
 ### 13. Monitoring/telemetry boundary
 
-Added `monitoring/project_72_metrics.py`, a dependency-free read-only Prometheus text exporter over collected evidence snapshots. Its label cardinality is bounded to assurance statuses and subscriber IDs `7001–7007`; sensitive subscriber/authentication material is excluded. Added deterministic exporter tests and a Make target.
+Added `monitoring/project_72_metrics.py`, a dependency-free read-only Prometheus text exporter over collected evidence snapshots. Its label cardinality is bounded to assurance statuses and subscriber IDs `7001–7007`; sensitive subscriber/authentication material is excluded. Added deterministic exporter tests and a Make target. Workflow #347 passed the metrics gate.
 
 ### 14. Backup/recovery boundary
 
-Added `scripts/project-72-backup.sh` and `docs/backup-recovery.md`. The procedure independently backs up canonical, durable idempotency and optional eSIM metadata databases, restricts backup permissions, creates checksums and excludes raw secrets/private keys. Restore acceptance requires an isolated target, index/schema validation and assurance tests before production consideration.
+Added `scripts/project-72-backup.sh` and `docs/backup-recovery.md`. The procedure independently backs up canonical, durable idempotency and optional eSIM metadata databases, restricts backup permissions, creates checksums and excludes raw secrets/private keys. The backup was subsequently hardened to use MongoDB Database Tools `--config` for sensitive URIs, preventing credentials from appearing in `mongodump` process arguments, and to reject empty archives.
 
 The procedure explicitly refuses remote MongoDB backup unless `MM7_BACKUP_ALLOW_REMOTE=1` is deliberately enabled.
 
-### 15. CI enforcement
+### 15. Open5GS projection fail-closed hardening
 
-Extended Project-72 GitHub Actions with metrics and security gates. The newest commits require a fresh workflow result before the status can be marked `PASS-CI` for this batch.
+Hardened `adapters/open5gs/adapter.py` so malformed `mm7_assurance.canonical_version` or `subscriber_status` values cannot raise an uncontrolled conversion exception during readback/projection comparison. Malformed values now fail closed as a mismatch. Added a regression test proving a malformed assurance marker becomes non-verified readback state rather than an exception.
+
+### 16. CI enforcement
+
+Workflow #347 succeeded for commit `568848a74b21f194f4e2b8501db660bee61966aa` on Ubuntu 22.04. It passed the Project-72 assurance suite, metrics exporter, IMS static safety gate, security/isolation gate, UERANSIM renderer and Asterisk PJSIP renderer. Subsequent commits contain additional Open5GS marker and backup URI hardening and therefore require a fresh CI run before those latest commits are marked fully CI-confirmed.
 
 ## Current engineering boundary
 
