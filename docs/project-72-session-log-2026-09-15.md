@@ -8,15 +8,7 @@ Added `project_72/assurance_core/test_idempotency_concurrency.py`.
 
 The test runs two independent `AssuranceCore` instances concurrently against the same thread-safe idempotency store and the same `ACTIVATE 7001` request. The race is deliberately controlled so one caller owns the reservation while its side-effect executor is in progress. The second caller must fail closed as `CONFLICT`.
 
-The test verifies:
-
-- exactly one caller reaches terminal `VERIFIED`;
-- the competing caller receives `CONFLICT` while the reservation is in progress;
-- no thread raises an unexpected exception;
-- the telecom side-effect executor is entered exactly once;
-- idempotency reservation is therefore the serialization boundary for duplicate concurrent requests.
-
-The test was hardened after review because the first version could permit either caller to finish before the other observed the reservation, making the expected result scheduler-dependent. The current version is deterministic and explicitly tests the fail-closed concurrent path.
+The test verifies exactly one side-effect execution, fail-closed duplicate handling and terminal assurance behavior.
 
 ### 2. UERANSIM renderer hardening
 
@@ -36,11 +28,33 @@ Added `scripts/project-72-host-evidence.sh` and a `make host-evidence` target. T
 
 Updated `docs/runtime-acceptance.md` to make this collector part of the Gate 4E evidence procedure.
 
-### 5. CI status
+### 5. Identity and eSIM artifact boundary
 
-Run #165 for commit `5e982e6c554894514c17d4781eb3acf675ae4299` completed successfully before the latest runtime/documentation commits. It passed both the Project-72 assurance suite and UERANSIM renderer validation.
+Added deterministic private identity generation for subscribers `7001–7007`, external eSIM activation-material resolution, LPA activation-artifact generation, metadata-only eSIM artifact persistence and an `ESIM_GENERATE` AssuranceCore path.
 
-The current branch head `4674229cbab42a822a9acc2ce14de3daac2133e6` has a newer Project-72 workflow run #177 queued. The latest commit therefore remains **CI PENDING** until that workflow completes.
+The eSIM implementation deliberately distinguishes `GENERATED`, `INSTALLED` and `VERIFIED`. It does not create a GSMA eSIM profile, impersonate an SM-DP+, install a profile on a device or claim device verification without authoritative external evidence.
+
+### 6. External IMS/PJSIP repository audit
+
+Audited the three newly supplied repositories:
+
+- `mojealterego/pjproject-archive`
+- `mojealterego/Pixel-turn-on-5G-Volte-and-automatically-register-with-IMS`
+- `selvakn/gsm-sip-bridge`
+
+The resulting architectural decisions are recorded in `docs/ims-external-reference-2026-09-15.md`.
+
+Key decisions:
+
+- `pjproject-archive`: historical PJSIP/PJMEDIA reference only; do not import its old source tree as the Project-72 IMS baseline.
+- Pixel repository: adapt the idea of device-side IMS acceptance evidence, but reject carrier-specific debug/property forcing as proof of registration. A claimed Android property is not authoritative network evidence.
+- `gsm-sip-bridge`: adapt strict configuration, TLS, recovery and observability patterns; do not turn the project into a carrier-facing GSM/VoWiFi/VoLTE gateway or uncontrolled PSTN/PLMN exit.
+
+The private IMS architecture remains Kamailio + Asterisk/PJSIP behind the Project-72 assurance boundary.
+
+### 7. CI status
+
+The latest confirmed Project-72 workflow is run #236 for commit `48cf0904165e7a26f4199c08e1b7dc474ff35a09`; it completed successfully. Earlier run #232 also completed successfully.
 
 ## Current engineering boundary
 
@@ -57,9 +71,11 @@ Code and deterministic tests cover:
 - UERANSIM seven-UE rendering and validation;
 - runtime preflight and dry-run safety boundary;
 - read-only host evidence capture;
-- private IMS scaffolding.
+- deterministic private identities;
+- eSIM activation-artifact generation and assurance path;
+- private IMS scaffolding and external IMS/PJSIP reference audit.
 
-The following still require the actual controlled deployment host:
+The following still require the actual controlled deployment host or external service/device:
 
 - MongoDB canonical/idempotency database acceptance;
 - Open5GS v2.8.0 live projection and authoritative readback;
@@ -68,6 +84,7 @@ The following still require the actual controlled deployment host:
 - Kamailio/Asterisk TLS/SRTP registration and internal call validation;
 - live drift injection/readback acceptance;
 - final security/isolation evidence;
+- real SM-DP+ provisioning, LPA installation and authoritative eSIM/device readback;
 - physical RAN and handset validation.
 
 No live telecom state is claimed from CI-only validation.
