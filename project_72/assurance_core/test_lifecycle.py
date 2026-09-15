@@ -70,6 +70,8 @@ class SubscriberLifecycleTest(unittest.TestCase):
             secret_refs=expected.secret_refs,
             services=expected.services,
             msisdn=expected.msisdn,
+            profile_id=expected.profile_id,
+            esim_status=expected.esim_status,
         )
         with self.assertRaises(StoreConflictError):
             repository.ensure_initial(conflicting)
@@ -102,6 +104,17 @@ class SubscriberLifecycleTest(unittest.TestCase):
         self.assertEqual(sorted(outcomes), ["ACCEPT", "ACCEPT"])
         self.assertEqual(repository.get(expected.subscriber_id), expected)
 
+    def test_lifecycle_preserves_esim_metadata(self) -> None:
+        subscriber = build_seven_subscriber_catalog()[0]
+        repository = InMemorySubscriberRepository({subscriber.subscriber_id: subscriber})
+        from project_72.assurance_core.lifecycle import transition
+        activated = transition(subscriber, "ACTIVATE")
+        self.assertEqual(activated.profile_id, subscriber.profile_id)
+        self.assertEqual(activated.esim_status, subscriber.esim_status)
+        self.assertEqual(activated.secret_refs["esim_activation"], subscriber.secret_refs["esim_activation"])
+        repository.put(activated, expected_version=1)
+        self.assertEqual(repository.get(subscriber.subscriber_id).profile_id, subscriber.profile_id)
+
     def test_7001_full_lifecycle_is_verified_at_each_gate(self) -> None:
         catalog = build_seven_subscriber_catalog()
         repository = InMemorySubscriberRepository({item.subscriber_id: item for item in catalog})
@@ -117,22 +130,9 @@ class SubscriberLifecycleTest(unittest.TestCase):
             for operation in ("ACTIVATE", "SUSPEND", "DEACTIVATE")
         })
 
-        for operation, version, expected_state in (
-            ("ACTIVATE", 1, "ACTIVE"),
-            ("SUSPEND", 2, "SUSPENDED"),
-            ("DEACTIVATE", 3, "RETIRED"),
-        ):
-            core = AssuranceCore(
-                repository,
-                broker,
-                adapter.execute,
-                adapter.readback,
-                lifecycle_postcondition(expected_state),
-            )
-            result = core.execute(
-                principal="assurance-service",
-                request=request(operation, "7001", version),
-            )
+        for operation, version, expected_state in (("ACTIVATE", 1, "ACTIVE"), ("SUSPEND", 2, "SUSPENDED"), ("DEACTIVATE", 3, "RETIRED")):
+            core = AssuranceCore(repository, broker, adapter.execute, adapter.readback, lifecycle_postcondition(expected_state))
+            result = core.execute(principal="assurance-service", request=request(operation, "7001", version))
             self.assertEqual(result.status, AssuranceStatus.VERIFIED)
             self.assertEqual(result.observed_version, version + 1)
 
@@ -144,24 +144,9 @@ class SubscriberLifecycleTest(unittest.TestCase):
         repository = InMemorySubscriberRepository({item.subscriber_id: item for item in catalog})
         collection = FakeCollection()
         adapter = Open5GSAdapter(repository, collection, FakeSecrets())
-        broker = CapabilityBroker({
-            "ACTIVATE": Policy(
-                version="policy-1",
-                allowed_operations=frozenset({"ACTIVATE"}),
-                allowed_principals=frozenset({"assurance-service"}),
-            )
-        })
-        core = AssuranceCore(
-            repository,
-            broker,
-            adapter.execute,
-            adapter.readback,
-            lifecycle_postcondition("ACTIVE"),
-        )
-        result = core.execute(
-            principal="assurance-service",
-            request=request("ACTIVATE", "7001", 99),
-        )
+        broker = CapabilityBroker({"ACTIVATE": Policy(version="policy-1", allowed_operations=frozenset({"ACTIVATE"}), allowed_principals=frozenset({"assurance-service"}))})
+        core = AssuranceCore(repository, broker, adapter.execute, adapter.readback, lifecycle_postcondition("ACTIVE"))
+        result = core.execute(principal="assurance-service", request=request("ACTIVATE", "7001", 99))
         self.assertEqual(result.status, AssuranceStatus.DENIED)
         self.assertEqual(repository.get("7001").version, 1)
 
