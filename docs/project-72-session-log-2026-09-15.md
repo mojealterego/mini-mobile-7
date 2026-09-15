@@ -18,19 +18,31 @@ The test verifies:
 
 The test was hardened after review because the first version could permit either caller to finish before the other observed the reservation, making the expected result scheduler-dependent. The current version is deterministic and explicitly tests the fail-closed concurrent path.
 
-### 2. Assurance test target expanded
+### 2. UERANSIM renderer hardening
 
-Updated `Makefile` so `make assurance-test` explicitly executes the concurrency test together with the existing assurance, lifecycle, drift, idempotency, runtime-wiring and Open5GS integration suites.
+Added `project_72/assurance_core/test_ueransim_renderer.py` and wired it into `make assurance-test` and CI.
+
+The renderer suite now verifies:
+
+- all seven `7001`-`7007` outputs are produced;
+- deterministic subscriber/IMSI mapping remains aligned with the seven-UE catalog;
+- the lab PLMN, APN and gNB search address are present;
+- generated runtime configuration permissions are exactly `0600`;
+- a missing external authentication reference fails closed and leaves no output for the failed subscriber;
+- malformed authentication material is rejected and its partial output is removed;
+- the renderer source contains no direct authentication literals.
+
+CI continues to use synthetic non-production authentication material only.
 
 ### 3. CI verification
 
-GitHub Actions run #147 for commit `1133433154f633e392948bee1ec85b986202c223` completed with `success` before this deterministic-race correction.
+GitHub Actions run #165 for commit `5e982e6c554894514c17d4781eb3acf675ae4299` completed with `success`. Both the full Project-72 assurance test target and the dedicated UERANSIM renderer validation step passed.
 
-The race correction is now committed as `3ee146ff65d37c9232b25384bd557adc2995f1b9` and has triggered a new CI run. That run must finish before the corrected revision is marked CI-green.
+This supersedes the earlier pending state from run #154. The corrected concurrent-idempotency behavior and renderer hardening are now CI-green on the current branch head.
 
 ### 4. Gate 4E preparation review
 
-Reviewed the current UERANSIM renderer and runtime acceptance boundary. The renderer already produces seven deployment-local UE configurations from external authentication references and validates the deterministic seven-UE IMSI mapping. Gate 4E remains a host-runtime task: start the pinned Open5GS/AMF path, start the UERANSIM gNB, attach one UE at a time, validate PDU session establishment and compare authoritative runtime state with canonical state.
+The current UERANSIM renderer and runtime acceptance boundary remain deployment-local. Gate 4E is still a host-runtime task: start the pinned Open5GS/AMF path, start the UERANSIM gNB, attach one UE at a time, validate PDU session establishment and compare authoritative runtime state with canonical state.
 
 No host execution was claimed because no live Open5GS/UERANSIM target is available through this repository session.
 
