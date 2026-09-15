@@ -12,6 +12,10 @@ write_cmd() {
     printf '$'
     printf ' %q' "$@"
     printf '\n'
+    if ! command -v "$1" >/dev/null 2>&1; then
+      printf 'UNAVAILABLE: command not found: %s\n' "$1"
+      return 0
+    fi
     "$@"
   } >"$OUT_DIR/${name}.txt" 2>&1 || true
 }
@@ -38,6 +42,8 @@ done
 
 if command -v mongosh >/dev/null 2>&1; then
   write_cmd mongodb-version mongosh --quiet --eval 'db.version()'
+else
+  printf '%s\n' 'UNAVAILABLE: command not found: mongosh' >"$OUT_DIR/mongodb-version.txt"
 fi
 
 if [[ -d runtime/ueransim ]]; then
@@ -49,5 +55,10 @@ if [[ -d runtime/ueransim ]]; then
       done >"$OUT_DIR/ueransim-files.txt"
 fi
 
-systemctl list-units --type=service --state=running --no-pager >"$OUT_DIR/running-services.txt" 2>&1 || true
+if command -v systemctl >/dev/null 2>&1; then
+  systemctl list-units --type=service --state=running --no-pager >"$OUT_DIR/running-services.txt" 2>&1 || true
+else
+  printf '%s\n' 'UNAVAILABLE: command not found: systemctl' >"$OUT_DIR/running-services.txt"
+fi
+
 printf 'Evidence written to %s\n' "$OUT_DIR"
