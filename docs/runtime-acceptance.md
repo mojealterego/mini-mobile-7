@@ -2,15 +2,25 @@
 
 This runbook is the boundary between deterministic CI validation and live controlled-lab validation.
 
-## Gate 4A — host preflight
+## Gate 4A — runtime capability and host preflight
 
-On the controlled Ubuntu 22.04 host:
+On a candidate host, first run the read-only capability diagnostic:
+
+```bash
+make runtime-capabilities
+```
+
+This reports systemd/PID 1, cgroup visibility, KVM/TUN device access, network inspection, IPv4 forwarding sysctl visibility, firewall access, socket inspection and kernel SCTP visibility. It does not install packages or mutate network/telecom state.
+
+Then, on the controlled Ubuntu 22.04 host:
 
 ```bash
 make preflight
 ```
 
 The gate must pass before any subscriber mutation. It checks Open5GS/MongoDB presence and activity, `ogstun`, UE routing, IPv4 forwarding, firewall policy, Python MongoDB support and all seven external authentication references without printing secret values.
+
+A 22.04 userland inside Termux/proot is not considered a live runtime host when systemd or the required kernel/network capabilities are unavailable. Do not bypass the gate to force provisioning in such an environment.
 
 ## Gate 4B — canonical catalog
 
