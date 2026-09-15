@@ -123,16 +123,16 @@ make ims-config-check
 
 ## Project-72 implementation log
 
-Substantive Project-72 implementation work is recorded in `docs/project-72-session-log-2026-09-15.md` and `docs/project-status.md`. The current codebase includes the canonical subscriber store, fail-closed Capability Broker, Assurance Core, optimistic concurrency, durable idempotency, Open5GS v2.8.0 projection/readback, seven-UE UERANSIM rendering, runtime preflight/dry-run boundaries, host evidence collection, private identity generation and a controlled eSIM activation-artifact boundary.
+Substantive Project-72 implementation work is recorded in `docs/project-72-session-log-2026-09-15.md` and `docs/project-status.md`. The current codebase includes the canonical subscriber store, fail-closed Capability Broker, Assurance Core, optimistic concurrency, durable idempotency, Open5GS v2.8.0 projection/readback, hardened drift detection, seven-UE UERANSIM rendering, runtime preflight/dry-run boundaries, host evidence collection, private identity generation and a controlled eSIM activation-artifact boundary.
 
 The private IMS boundary now includes explicit Kamailio REGISTER routing, a deployment-time seven-subscriber Asterisk/PJSIP renderer and a static IMS safety gate covering private binds, TLS/SRTP requirements, external credentials and absence of an active public-telephony route.
 
+The eSIM boundary includes metadata-only artifact persistence and fail-closed interrupted-write reconciliation. A matching persisted artifact may advance canonical state only when all authority/version/profile/reference invariants match; mismatched artifacts are rejected. `GENERATED`, `INSTALLED` and `VERIFIED` remain distinct states.
+
 The latest external IMS reference audit covers `mojealterego/pjproject-archive`, `mojealterego/Pixel-turn-on-5G-Volte-and-automatically-register-with-IMS` and `selvakn/gsm-sip-bridge`. The audit is documented in `docs/ims-external-reference-2026-09-15.md`. These repositories are used selectively as reference material; they do not replace Project-72 authorization, canonical state, Open5GS version pinning, or authoritative readback.
 
-Latest previously confirmed Project-72 CI: workflow run #236 completed successfully for commit `48cf0904165e7a26f4199c08e1b7dc474ff35a09`. A new workflow was triggered after the IMS/CI changes and must complete before the latest HEAD is marked CI-verified.
+Latest previously confirmed Project-72 CI: workflow #284 completed successfully for commit `1802d86237d2e3a8c4b99e03ab3e3a7e0e6cddfe`. Later commits hardened drift detection and eSIM reconciliation and therefore require a new CI result before the current HEAD is marked `PASS-CI`.
 
 ### Current limitations
 
-CI and source-level tests do not prove a live telecom deployment. Still pending are the actual MongoDB/Open5GS host acceptance, seven live UERANSIM attaches and PDU sessions, UE Internet validation, live Kamailio/Asterisk TLS/SRTP registration and internal calls, operational drift/security evidence, real SM-DP+ eSIM provisioning and device readback, and physical RAN/handset validation.
-
-`GENERATED`, `INSTALLED` and `VERIFIED` remain distinct eSIM states. No source-only result is treated as physical or device verification.
+CI and source-level tests do not prove a live telecom deployment. Still pending are the new CI validation, actual MongoDB/Open5GS host acceptance, seven live UERANSIM attaches and PDU sessions, UE Internet validation, live Kamailio/Asterisk TLS/SRTP registration and internal calls, operational drift/security evidence, real SM-DP+ eSIM provisioning and device readback, and physical RAN/handset validation.
