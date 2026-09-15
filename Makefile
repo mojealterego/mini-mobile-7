@@ -1,4 +1,4 @@
-.PHONY: help validate bootstrap-ubuntu22 build-ueransim assurance-test preflight render-ueransim provision-seven
+.PHONY: help validate bootstrap-ubuntu22 build-ueransim assurance-test preflight render-ueransim provision-seven host-evidence
 
 help:
 	@echo "MINI-MOBILE-7 commands:"
@@ -9,6 +9,7 @@ help:
 	@echo "  make preflight        - run the Project-72 runtime safety gate"
 	@echo "  make render-ueransim  - render deployment-local UE configs from external secrets"
 	@echo "  make provision-seven   - dry-run seven-subscriber runtime provisioning"
+	@echo "  make host-evidence    - collect read-only host acceptance evidence"
 
 validate:
 	bash scripts/validate-host.sh
@@ -40,3 +41,6 @@ render-ueransim:
 
 provision-seven:
 	PYTHONPATH=. python3 scripts/project-72-provision-seven.py
+
+host-evidence:
+	bash scripts/project-72-host-evidence.sh
