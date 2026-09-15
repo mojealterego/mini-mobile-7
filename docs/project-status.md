@@ -15,7 +15,7 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | Subscriber lifecycle | IMPLEMENTED IN CODE | PROVISIONED -> ACTIVE -> SUSPENDED -> RETIRED with optimistic concurrency |
 | Lifecycle postconditions | IMPLEMENTED IN CODE | ACTIVATE/SUSPEND/DEACTIVATE each require authoritative readback and state-specific postcondition |
 | Seven-subscriber lifecycle tests | TESTED IN CI | Catalog, lifecycle and wrong-version denial covered by deterministic tests |
-| CI validation | PENDING FRESH RUN | Renderer/runtime-wiring hardening committed; newest workflow must complete |
+| CI validation | PASS-CI | Workflow run #177 passed after runtime-wiring/dry-run and host-evidence changes |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
 | Runtime provisioner | IMPLEMENTED IN CODE | `--execute` requires durable MongoDB idempotency URI and injects `MongoIdempotencyStore` into AssuranceCore |
 | Runtime dry-run boundary | IMPLEMENTED IN CODE | Dry-run exits before runtime database construction or mutation path |
