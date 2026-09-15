@@ -26,6 +26,8 @@ Added regression coverage confirming that runtime dry-run exits before construct
 
 Added `scripts/project-72-host-evidence.sh` and a `make host-evidence` target. The collector records OS/kernel, IP addressing/routes, `ogstun`, IPv4 forwarding, firewall rules, listening sockets, relevant service status, MongoDB version when available, running services and hashes/permissions of deployment-local UERANSIM files. It uses `umask 077` and intentionally does not collect authentication material or mutate telecom state.
 
+The collector is systemd-aware: when `systemctl` is absent it records an explicit `UNAVAILABLE` result instead of emitting misleading command failures.
+
 Updated `docs/runtime-acceptance.md` to make this collector part of the Gate 4E evidence procedure.
 
 ### 5. Identity and eSIM artifact boundary
@@ -52,7 +54,7 @@ Added `project_72/assurance_core/test_asterisk_renderer.py` and the private Kama
 
 ### 8. Static IMS safety gate and CI closure
 
-Added `scripts/project-72-ims-config-check.sh` and `make ims-config-check` as a deterministic static gate. Workflow #284 completed successfully for commit `1802d86237d2e3a8c4b99e03ab3e3a7e0e6cddfe`.
+Added `scripts/project-72-ims-config-check.sh` and `make ims-config-check` as a deterministic static gate. The latest CI workflow continues to enforce the gate.
 
 ### 9. Drift detection hardening
 
@@ -60,7 +62,7 @@ Expanded `DriftDetector` so an `IN_SYNC` result requires authoritative agreement
 
 ### 10. eSIM interrupted-write reconciliation
 
-Hardened `ESIM_GENERATE` around its two persistence domains. Exact matching artifacts can be reconciled after an interrupted canonical write; mismatched artifacts are rejected. The mechanism does not assume a cross-store transaction.
+Hardened `ESIM_GENERATE` around its two persistence domains. Exact matching artifacts can be reconciled after an interrupted canonical commit; mismatched artifacts are rejected. The mechanism does not assume a cross-store transaction.
 
 ### 11. Lifecycle cleanup
 
@@ -70,15 +72,15 @@ Simplified lifecycle transition state preservation while retaining immutable can
 
 Added `scripts/project-72-security-check.sh`. The gate rejects floating deployment versions, obvious checked-in credentials/private keys, public IMS SIP binds and unsafe host-network/privileged defaults. It also verifies the private IMS ACL, private TLS dispatcher and Asterisk media-isolation baseline.
 
-The first CI attempt exposed a shell-quoting syntax defect in the scanner itself. The scanner was rewritten with simpler independent expressions and exclusion of its own file. Workflow #347 then completed successfully, including the security gate.
+The first CI attempt exposed a shell-quoting syntax defect in the scanner itself. The scanner was rewritten with simpler independent expressions and exclusion of its own file. The corrected workflow passed.
 
 ### 13. Monitoring/telemetry boundary
 
-Added `monitoring/project_72_metrics.py`, a dependency-free read-only Prometheus text exporter over collected evidence snapshots. Its label cardinality is bounded to assurance statuses and subscriber IDs `7001–7007`; sensitive subscriber/authentication material is excluded. Added deterministic exporter tests and a Make target. Workflow #347 passed the metrics gate.
+Added `monitoring/project_72_metrics.py`, a dependency-free read-only Prometheus text exporter over collected evidence snapshots. Its label cardinality is bounded to assurance statuses and subscriber IDs `7001–7007`; sensitive subscriber/authentication material is excluded. Added deterministic exporter tests and a Make target.
 
 ### 14. Backup/recovery boundary
 
-Added `scripts/project-72-backup.sh` and `docs/backup-recovery.md`. The procedure independently backs up canonical, durable idempotency and optional eSIM metadata databases, restricts backup permissions, creates checksums and excludes raw secrets/private keys. The backup was subsequently hardened to use MongoDB Database Tools `--config` for sensitive URIs, preventing credentials from appearing in `mongodump` process arguments, and to reject empty archives.
+Added `scripts/project-72-backup.sh` and `docs/backup-recovery.md`. The procedure independently backs up canonical, durable idempotency and optional eSIM metadata databases, restricts backup permissions, creates checksums and excludes raw secrets/private keys. The backup was hardened to use MongoDB Database Tools `--config` for sensitive URIs, preventing credentials from appearing in `mongodump` process arguments, and to reject empty archives.
 
 The procedure explicitly refuses remote MongoDB backup unless `MM7_BACKUP_ALLOW_REMOTE=1` is deliberately enabled.
 
@@ -88,7 +90,13 @@ Hardened `adapters/open5gs/adapter.py` so malformed `mm7_assurance.canonical_ver
 
 ### 16. CI enforcement
 
-Workflow #347 succeeded for commit `568848a74b21f194f4e2b8501db660bee61966aa` on Ubuntu 22.04. It passed the Project-72 assurance suite, metrics exporter, IMS static safety gate, security/isolation gate, UERANSIM renderer and Asterisk PJSIP renderer. Subsequent commits contain additional Open5GS marker and backup URI hardening and therefore require a fresh CI run before those latest commits are marked fully CI-confirmed.
+Workflow #358 succeeded for the hardened commit `e15bdc4b555394cade7bb469cc1914c127e494fe`, passing the Project-72 assurance suite, metrics exporter, IMS static safety gate, security/isolation gate, UERANSIM renderer and Asterisk PJSIP renderer. The documentation-only follow-up workflow #369 also completed successfully after the status and runtime-diagnostic updates.
+
+### 17. Runtime capability diagnostics
+
+Added `scripts/project-72-runtime-capabilities.sh` and `make runtime-capabilities`. This is a read-only environment diagnostic, not a provisioning gate. It reports the presence and operational state of systemd, cgroup visibility, KVM/TUN device access, network inspection, IPv4 forwarding sysctl visibility, iptables access, socket inspection and kernel SCTP visibility.
+
+The purpose is to distinguish a 22.04 userland/container from a host capable of supporting the Project-72 live runtime. It performs no package installation, interface creation, service start, firewall mutation or telecom operation.
 
 ## Current engineering boundary
 
