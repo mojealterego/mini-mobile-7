@@ -24,6 +24,8 @@ jobs:
           python-version: "3.11"
       - name: Run Project-72 assurance tests
         run: make assurance-test
+      - name: Validate IMS configuration boundary
+        run: make ims-config-check
       - name: Validate UERANSIM renderer
         env:
           MM7_SECRET_MINI_MOBILE_7_7001: '{"k":"00000000000000000000000000000001","opc":"00000000000000000000000000000002","amf":"8000"}'
