@@ -7,7 +7,7 @@ from project_72.assurance_core.broker import CapabilityBroker, Policy
 from project_72.assurance_core.catalog import build_seven_subscriber_catalog
 from project_72.assurance_core.esim import EsimStatus
 from project_72.assurance_core.esim_adapter import EsimProvisioningAdapter
-from project_72.assurance_core.esim_repository import InMemoryEsimArtifactRepository
+from project_72.assurance_core.esim_repository import InMemoryEsimArtifactRepository, StoredEsimArtifact
 from project_72.assurance_core.idempotency import InMemoryIdempotencyStore
 from project_72.assurance_core.models import AssuranceStatus, ExecutionRequest
 from project_72.assurance_core.store import InMemorySubscriberRepository
@@ -96,6 +96,44 @@ class EsimAssuranceTests(unittest.TestCase):
         self.assertEqual(result.status, AssuranceStatus.DENIED)
         with self.assertRaises(KeyError):
             self.artifacts.get("7001")
+
+    def test_reconciles_artifact_left_by_interrupted_canonical_commit(self) -> None:
+        subscriber = self.repository.get("7001")
+        self.artifacts.put(
+            StoredEsimArtifact(
+                subscriber_id="7001",
+                profile_id=subscriber.profile_id or "",
+                smdp_address="smdp.example.invalid",
+                activation_code_ref=subscriber.secret_refs["esim_activation"],
+                activation_uri_sha256="a" * 64,
+                status="GENERATED",
+                version=2,
+            ),
+            expected_version=0,
+        )
+
+        self.assertTrue(self.adapter.execute(self._request()))
+        reconciled = self.repository.get("7001")
+        self.assertEqual(reconciled.version, 2)
+        self.assertEqual(reconciled.esim_status, EsimStatus.GENERATED)
+        self.assertEqual(self.resolver.calls, 0)
+
+    def test_reconciliation_rejects_mismatched_profile(self) -> None:
+        self.artifacts.put(
+            StoredEsimArtifact(
+                subscriber_id="7001",
+                profile_id="wrong-profile",
+                smdp_address="smdp.example.invalid",
+                activation_code_ref="env://MINI_MOBILE_7_ESIM/7001",
+                activation_uri_sha256="a" * 64,
+                status="GENERATED",
+                version=2,
+            ),
+            expected_version=0,
+        )
+        with self.assertRaises(ValueError):
+            self.adapter.execute(self._request())
+        self.assertEqual(self.repository.get("7001").version, 1)
 
     def test_readback_detects_canonical_artifact_drift(self) -> None:
         self._core().execute(principal="project-72-operator", request=self._request())
