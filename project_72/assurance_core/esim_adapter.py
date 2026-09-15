@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import replace
-from typing import Any, Mapping
+from typing import Mapping
 
 from .esim import EsimArtifactGenerator, EsimProfileMetadata, EsimSecretResolver, EsimStatus
 from .esim_repository import EsimArtifactNotFoundError, EsimArtifactRepository, StoredEsimArtifact
-from .models import AuthoritativeReadback, ExecutionRequest
+from .models import AuthoritativeReadback, ExecutionRequest, Subscriber
 from .store import StoreConflictError, SubscriberRepository
 
 
@@ -84,7 +84,7 @@ class EsimProvisioningAdapter:
         self._repository.put(updated, expected_version=request.expected_version)
         return True
 
-    def _reconcile_persisted_artifact(self, subscriber: Any) -> bool | None:
+    def _reconcile_persisted_artifact(self, subscriber: Subscriber) -> bool | None:
         """Promote only an exact artifact left by a previous interrupted commit."""
         try:
             artifact = self._artifacts.get(subscriber.subscriber_id)
@@ -187,7 +187,7 @@ def _artifact_fingerprint(artifact: StoredEsimArtifact) -> str:
     ).hexdigest()
 
 
-def _artifact_fingerprint_from_values(details: Mapping[str, Any]) -> str:
+def _artifact_fingerprint_from_values(details: Mapping[str, object]) -> str:
     return hashlib.sha256(
         "|".join(
             (
