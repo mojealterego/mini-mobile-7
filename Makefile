@@ -1,15 +1,17 @@
-.PHONY: help validate bootstrap-ubuntu22 build-ueransim assurance-test preflight render-ueransim provision-seven host-evidence
+.PHONY: help validate bootstrap-ubuntu22 build-ueransim assurance-test preflight render-ueransim provision-seven host-evidence generate-identities generate-esim
 
 help:
 	@echo "MINI-MOBILE-7 commands:"
 	@echo "  make validate          - validate the Linux host prerequisites"
 	@echo "  make bootstrap-ubuntu22 - install pinned lab host prerequisites"
 	@echo "  make build-ueransim   - build pinned UERANSIM"
-	@echo "  make assurance-test   - run Project-72 assurance, adapter, lifecycle, idempotency, concurrency, renderer and runtime-wiring tests"
+	@echo "  make assurance-test   - run Project-72 assurance, adapter, lifecycle, idempotency, concurrency, renderer, identity/eSIM and runtime-wiring tests"
 	@echo "  make preflight        - run the Project-72 runtime safety gate"
 	@echo "  make render-ueransim  - render deployment-local UE configs from external secrets"
 	@echo "  make provision-seven   - dry-run seven-subscriber runtime provisioning"
 	@echo "  make host-evidence    - collect read-only host acceptance evidence"
+	@echo "  make generate-identities - print deterministic private identities 7001-7007"
+	@echo "  make generate-esim    - run eSIM artifact unit tests without contacting an SM-DP+"
 
 validate:
 	bash scripts/validate-host.sh
@@ -30,6 +32,7 @@ assurance-test:
 		project_72.assurance_core.test_concurrency \
 		project_72.assurance_core.test_runtime_wiring \
 		project_72.assurance_core.test_ueransim_renderer \
+		project_72.assurance_core.test_identity_esim \
 		adapters.open5gs.test_adapter \
 		adapters.open5gs.test_assurance_integration -v
 
@@ -44,3 +47,9 @@ provision-seven:
 
 host-evidence:
 	bash scripts/project-72-host-evidence.sh
+
+generate-identities:
+	PYTHONPATH=. python3 -c 'from project_72.assurance_core.identity import IdentityGenerator; [print(f"{x.subscriber_id} {x.extension} {x.sip_uri} {x.tel_uri}") for x in IdentityGenerator().generate_all()]'
+
+generate-esim:
+	PYTHONPATH=. python3 -m unittest project_72.assurance_core.test_identity_esim -v
