@@ -45,7 +45,10 @@ class AsteriskRendererTests(unittest.TestCase):
     def test_missing_password_fails_closed_and_writes_no_output(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output = Path(directory) / "pjsip.conf"
-            result = run_renderer(output, os.environ.copy())
+            env = os.environ.copy()
+            for subscriber_id in range(7001, 7008):
+                env.pop(f"MM7_SIP_PASSWORD_{subscriber_id}", None)
+            result = run_renderer(output, env)
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse(output.exists())
             self.assertIn("missing required secret environment variable", result.stderr)
