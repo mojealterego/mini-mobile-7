@@ -35,10 +35,22 @@ if grep -Eiq '(^|[[:space:]])password[[:space:]]*=[[:space:]]*[^$[:space:];]+' "
   exit 1
 fi
 
-# Ignore comments when checking for an actual public-telephony route.
-if sed '/^[[:space:]]*;/d' "$KAMAILIO_CFG" "$ASTERISK_CFG" "$DISPATCHER" \
-    | grep -Eiq '(^|[^A-Za-z])(pstn|public[[:space:]-]*plmn|tel:[+][0-9])'; then
-  echo "public telephony gateway marker detected in active IMS template content" >&2
+# The only checked-in SIP destination must be the private Asterisk endpoint.
+if grep -E 'sip:' "$DISPATCHER" | grep -vF 'sip:10.40.0.20:5061;transport=tls'; then
+  echo "non-private SIP destination detected in dispatcher" >&2
+  exit 1
+fi
+
+# No external SIP destination or public-number dial target is permitted in the templates.
+if grep -REiq 'sip:[^[:space:]]*@(?!10\.40\.0\.20)' "$KAMAILIO_CFG" "$ASTERISK_CFG" 2>/dev/null; then
+  echo "external SIP URI detected in IMS templates" >&2
+  exit 1
+fi
+
+# Architecture remains private: explicit public telephony gateway configuration is absent.
+if grep -Eiq '(^|[[:space:]])(trunk|gateway|outbound[_-]route|external[_-]route)[[:space:]]*=' \
+    "$KAMAILIO_CFG" "$ASTERISK_CFG"; then
+  echo "external gateway/route configuration detected in IMS templates" >&2
   exit 1
 fi
 
