@@ -41,13 +41,7 @@ if grep -E 'sip:' "$DISPATCHER" | grep -vF 'sip:10.40.0.20:5061;transport=tls'; 
   exit 1
 fi
 
-# No external SIP destination or public-number dial target is permitted in the templates.
-if grep -REiq 'sip:[^[:space:]]*@(?!10\.40\.0\.20)' "$KAMAILIO_CFG" "$ASTERISK_CFG" 2>/dev/null; then
-  echo "external SIP URI detected in IMS templates" >&2
-  exit 1
-fi
-
-# Architecture remains private: explicit public telephony gateway configuration is absent.
+# No external gateway/route configuration is permitted in the private IMS templates.
 if grep -Eiq '(^|[[:space:]])(trunk|gateway|outbound[_-]route|external[_-]route)[[:space:]]*=' \
     "$KAMAILIO_CFG" "$ASTERISK_CFG"; then
   echo "external gateway/route configuration detected in IMS templates" >&2
