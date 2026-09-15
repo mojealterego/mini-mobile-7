@@ -12,7 +12,17 @@
     "ue_ip": {"type": "string", "format": "ipv4"},
     "status": {"type": "string", "enum": ["PROVISIONED", "ACTIVE", "SUSPENDED", "RETIRED"]},
     "version": {"type": "integer", "minimum": 1},
-    "secret_refs": {"type": "object", "additionalProperties": false, "required": ["authentication"], "properties": {"authentication": {"type": "string", "minLength": 1}}},
+    "secret_refs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authentication"],
+      "properties": {
+        "authentication": {"type": "string", "minLength": 1},
+        "esim_activation": {"type": "string", "pattern": "^env://.+"}
+      }
+    },
+    "profile_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]{3,128}$"},
+    "esim_status": {"type": "string", "enum": ["PLANNED", "GENERATED", "INSTALLED", "VERIFIED"]},
     "services": {"type": "object", "additionalProperties": false, "required": ["ims", "data"], "properties": {"ims": {"type": "boolean"}, "data": {"type": "boolean"}, "pstn_outbound": {"type": "boolean"}, "pstn_inbound": {"type": "boolean"}}}
   }
 }
