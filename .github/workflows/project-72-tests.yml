@@ -45,3 +45,23 @@ jobs:
           grep -q "supi: 'imsi-001010000000007'" /tmp/mm7-ueransim/ue-7007.yaml
           grep -q "apn: internet" /tmp/mm7-ueransim/ue-7001.yaml
           grep -q "gnbSearchList:" /tmp/mm7-ueransim/ue-7001.yaml
+      - name: Validate Asterisk PJSIP renderer
+        env:
+          MM7_SIP_PASSWORD_7001: synthetic-ci-password-7001
+          MM7_SIP_PASSWORD_7002: synthetic-ci-password-7002
+          MM7_SIP_PASSWORD_7003: synthetic-ci-password-7003
+          MM7_SIP_PASSWORD_7004: synthetic-ci-password-7004
+          MM7_SIP_PASSWORD_7005: synthetic-ci-password-7005
+          MM7_SIP_PASSWORD_7006: synthetic-ci-password-7006
+          MM7_SIP_PASSWORD_7007: synthetic-ci-password-7007
+        run: |
+          bash -n scripts/project-72-render-asterisk-pjsip.sh
+          PYTHONPATH=. python3 -m unittest project_72.assurance_core.test_asterisk_renderer -v
+          bash scripts/project-72-render-asterisk-pjsip.sh /tmp/mm7-pjsip.conf
+          test "$(stat -c '%a' /tmp/mm7-pjsip.conf)" -eq 600
+          test "$(grep -c '^type=aor$' /tmp/mm7-pjsip.conf)" -eq 7
+          test "$(grep -c '^type=auth$' /tmp/mm7-pjsip.conf)" -eq 7
+          test "$(grep -c '^type=endpoint$' /tmp/mm7-pjsip.conf)" -eq 7
+          grep -q '^bind=10.40.0.20:5061$' /tmp/mm7-pjsip.conf
+          grep -q '^media_encryption=sdes$' /tmp/mm7-pjsip.conf
+          ! grep -q 'password=.*[;[:space:]]' /tmp/mm7-pjsip.conf
