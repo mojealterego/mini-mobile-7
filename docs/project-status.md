@@ -15,12 +15,13 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 | Subscriber lifecycle | IMPLEMENTED IN CODE | PROVISIONED -> ACTIVE -> SUSPENDED -> RETIRED with optimistic concurrency |
 | Lifecycle postconditions | IMPLEMENTED IN CODE | ACTIVATE/SUSPEND/DEACTIVATE each require authoritative readback and state-specific postcondition |
 | Seven-subscriber lifecycle tests | TESTED IN CI | Catalog, lifecycle and wrong-version denial covered by deterministic tests |
-| CI validation | PENDING FRESH RUN | Run #147 passed before the deterministic concurrent-race correction; corrected revision is awaiting fresh CI |
+| CI validation | PENDING FRESH RUN | New renderer suite and corrected concurrent-race test require fresh CI completion |
 | Runtime preflight | IMPLEMENTED | Ubuntu/Open5GS/MongoDB/network/firewall/secret-reference gate before mutation |
 | Runtime provisioner | IMPLEMENTED IN CODE | `--execute` requires durable MongoDB idempotency URI and injects `MongoIdempotencyStore` into AssuranceCore |
 | UERANSIM gNB template | AUDITED | PLMN/TAC/SST/AMF/gNB addressing aligned with lab contract |
 | Seven-UE renderer | IMPLEMENTED | Deployment-local UE configs for 7001-7007; external authentication references |
-| Seven-UE renderer CI validation | IMPLEMENTED | Shell syntax and seven-config deterministic rendering tested with synthetic credentials |
+| Seven-UE renderer test suite | IMPLEMENTED IN CODE | Seven-way mapping, 0600 permissions, missing/malformed secret rejection and source secret-literal guard |
+| Seven-UE renderer CI validation | IMPLEMENTED | Dedicated unittest suite plus shell-level rendering checks with synthetic credentials |
 | UERANSIM attach | PENDING HOST | Requires actual UERANSIM/Open5GS runtime |
 | Seven live subscriber projections | NEXT | Requires actual MongoDB/Open5GS runtime and external secrets |
 | UE Internet | READY | Requires actual host routing/NAT configuration |
@@ -36,6 +37,7 @@ Phase 2A/2B/2C/2D implementation is being developed on `project-72/phase-2a` and
 - Authentication material is not supplied to the renderer as command-line arguments.
 - Generated runtime files are excluded from Git through `runtime/` in `.gitignore`.
 - CI uses synthetic non-production authentication values only.
+- Dedicated renderer tests now verify all seven identity mappings, `0600` output permissions, missing-secret fail-closed behavior and malformed authentication-material rejection.
 
 ## Gate 3B — optimistic concurrency
 
