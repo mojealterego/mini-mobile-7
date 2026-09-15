@@ -116,7 +116,7 @@ class Open5GSAdapter:
                 observed_version=0,
                 state="ABSENT",
                 fingerprint="",
-                details={"imsi": subscriber.imsi},
+                details={"imsi": subscriber.imsi, "ue_ip": subscriber.ue_ip},
             )
 
         marker = _assurance_marker(document) or {}
@@ -131,6 +131,7 @@ class Open5GSAdapter:
             fingerprint=_fingerprint(document),
             details={
                 "imsi": document.get("imsi"),
+                "ue_ip": _projected_ue_ip(document),
                 "subscriber_status": document.get("subscriber_status"),
                 "marker": dict(marker),
                 "services": _projected_services(document),
@@ -247,6 +248,22 @@ def _readback_state(subscriber: Subscriber, document: Mapping[str, Any]) -> str:
     if _projection_matches(subscriber, document):
         return subscriber.status.value
     return "MISMATCH"
+
+
+def _projected_ue_ip(document: Mapping[str, Any]) -> str | None:
+    slices = document.get("slice")
+    sessions = (
+        slices[0].get("session")
+        if isinstance(slices, list) and slices and isinstance(slices[0], Mapping)
+        else []
+    )
+    internet = next(
+        (s for s in sessions if isinstance(s, Mapping) and s.get("name") == "internet"),
+        None,
+    )
+    ue = internet.get("ue") if isinstance(internet, Mapping) else None
+    ip = ue.get("ipv4") if isinstance(ue, Mapping) else None
+    return ip if isinstance(ip, str) else None
 
 
 def _projected_services(document: Mapping[str, Any]) -> dict[str, bool]:
