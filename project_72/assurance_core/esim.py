@@ -3,19 +3,13 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
-from enum import Enum
 from typing import Mapping, Protocol
+
+from .models import EsimStatus
 
 
 class EsimProvisioningError(RuntimeError):
     """Raised when an eSIM provisioning artifact cannot be safely created."""
-
-
-class EsimStatus(str, Enum):
-    PLANNED = "PLANNED"
-    GENERATED = "GENERATED"
-    INSTALLED = "INSTALLED"
-    VERIFIED = "VERIFIED"
 
 
 class EsimSecretResolver(Protocol):
