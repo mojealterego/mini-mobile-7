@@ -17,7 +17,7 @@ from project_72.assurance_core.store import InMemorySubscriberRepository
 
 
 class ConcurrentIdempotencyReservationTest(unittest.TestCase):
-    def test_two_assurance_cores_share_one_side_effect(self) -> None:
+    def test_second_concurrent_caller_fails_closed_without_second_side_effect(self) -> None:
         store = InMemoryIdempotencyStore()
         repository = InMemorySubscriberRepository(
             {
@@ -44,12 +44,16 @@ class ConcurrentIdempotencyReservationTest(unittest.TestCase):
         )
         executions = 0
         executions_lock = threading.Lock()
-        start = threading.Barrier(2)
+        execution_started = threading.Event()
+        release_execution = threading.Event()
 
         def execute(_request: ExecutionRequest) -> bool:
             nonlocal executions
             with executions_lock:
                 executions += 1
+            execution_started.set()
+            if not release_execution.wait(timeout=2):
+                raise AssertionError("test execution gate timed out")
             return True
 
         def readback(target: str) -> AuthoritativeReadback:
@@ -77,23 +81,32 @@ class ConcurrentIdempotencyReservationTest(unittest.TestCase):
         )
         results: list = []
         errors: list[BaseException] = []
+        results_lock = threading.Lock()
 
         def worker(core: AssuranceCore) -> None:
             try:
-                start.wait(timeout=2)
-                results.append(core.execute(principal="test", request=request))
+                result = core.execute(principal="test", request=request)
+                with results_lock:
+                    results.append(result)
             except BaseException as exc:
-                errors.append(exc)
+                with results_lock:
+                    errors.append(exc)
 
-        threads = [threading.Thread(target=worker, args=(core,)) for core in cores]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join(timeout=3)
+        first = threading.Thread(target=worker, args=(cores[0],))
+        second = threading.Thread(target=worker, args=(cores[1],))
+        first.start()
+        self.assertTrue(execution_started.wait(timeout=2))
+        second.start()
+        second.join(timeout=2)
+        self.assertFalse(second.is_alive(), "second concurrent caller did not fail closed")
+        release_execution.set()
+        first.join(timeout=3)
 
+        self.assertFalse(first.is_alive(), "primary caller did not finish")
         self.assertFalse(errors, errors)
         self.assertEqual(len(results), 2)
-        self.assertTrue(all(result.status == AssuranceStatus.VERIFIED for result in results))
+        statuses = sorted(result.status for result in results)
+        self.assertEqual(statuses, [AssuranceStatus.CONFLICT, AssuranceStatus.VERIFIED])
         self.assertEqual(executions, 1)
 
 
