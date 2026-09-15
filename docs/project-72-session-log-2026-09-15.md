@@ -36,7 +36,7 @@ The eSIM implementation deliberately distinguishes `GENERATED`, `INSTALLED` and 
 
 ### 6. External IMS/PJSIP repository audit
 
-Audited the three newly supplied repositories:
+Audited the three supplied repositories:
 
 - `mojealterego/pjproject-archive`
 - `mojealterego/Pixel-turn-on-5G-Volte-and-automatically-register-with-IMS`
@@ -47,14 +47,22 @@ The resulting architectural decisions are recorded in `docs/ims-external-referen
 Key decisions:
 
 - `pjproject-archive`: historical PJSIP/PJMEDIA reference only; do not import its old source tree as the Project-72 IMS baseline.
-- Pixel repository: adapt the idea of device-side IMS acceptance evidence, but reject carrier-specific debug/property forcing as proof of registration. A claimed Android property is not authoritative network evidence.
+- Pixel repository: adapt the idea of device-side IMS acceptance evidence, but reject carrier-specific debug/property forcing as proof of registration. A claimed Android registration property is not authoritative network evidence.
 - `gsm-sip-bridge`: adapt strict configuration, TLS, recovery and observability patterns; do not turn the project into a carrier-facing GSM/VoWiFi/VoLTE gateway or uncontrolled PSTN/PLMN exit.
 
-The private IMS architecture remains Kamailio + Asterisk/PJSIP behind the Project-72 assurance boundary.
+### 7. Private IMS configuration completion
 
-### 7. CI status
+Added `scripts/project-72-render-asterisk-pjsip.sh` to render all seven private Asterisk/PJSIP endpoints from external runtime secrets. The renderer does not accept passwords as CLI arguments, writes `0600` output and rejects unsafe configuration characters.
 
-The latest confirmed Project-72 workflow is run #236 for commit `48cf0904165e7a26f4199c08e1b7dc474ff35a09`; it completed successfully. Earlier run #232 also completed successfully.
+Added `project_72/assurance_core/test_asterisk_renderer.py` covering seven-way rendering, missing-secret fail-closed behavior, unsafe-character rejection, permissions and source secret-boundary checks.
+
+Updated the Kamailio example so private `REGISTER` traffic is explicitly dispatched to the controlled Asterisk registrar after the private IMS ACL. This closes a configuration gap where the prior example would not route REGISTER requests.
+
+The renderer and REGISTER route are configuration/automation completion only; live TLS, SIP registration and media still require the controlled host.
+
+### 8. Documentation continuity
+
+Updated `README.md`, `docs/project-status.md` and this session log with the IMS renderer, REGISTER boundary and external repository audit.
 
 ## Current engineering boundary
 
@@ -73,6 +81,8 @@ Code and deterministic tests cover:
 - read-only host evidence capture;
 - deterministic private identities;
 - eSIM activation-artifact generation and assurance path;
+- Asterisk seven-subscriber PJSIP rendering;
+- private Kamailio REGISTER dispatch;
 - private IMS scaffolding and external IMS/PJSIP reference audit.
 
 The following still require the actual controlled deployment host or external service/device:
