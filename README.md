@@ -1,3 +1,13 @@
+<div align="center">
+
+<img src="./assets/social-preview.svg" alt="MINI-MOBILE-7 — project visual" width="100%">
+
+## MOJEALTEREGO · PROJECT PROFILE
+
+</div>
+
+---
+
 # MINI-MOBILE-7
 
 Private LTE/5G laboratory and private cellular network blueprint for up to 7 controlled devices.
