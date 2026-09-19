@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#040607"/><stop offset=".58" stop-color="#0B1114"/><stop offset="1" stop-color="#11191B"/></linearGradient><radialGradient id="g"><stop stop-color="#C9A45C" stop-opacity=".3"/><stop offset="1" stop-color="#C9A45C" stop-opacity="0"/></radialGradient></defs>
+<rect width="1200" height="600" fill="url(#bg)"/><circle cx="1010" cy="160" r="330" fill="url(#g)"/>
+<path d="M0 500 C230 400 410 560 610 470 S980 360 1200 470" fill="none" stroke="#2A8D97" stroke-width="3" opacity=".65"/>
+<path d="M0 545 C260 445 450 600 690 500 S1000 420 1200 505" fill="none" stroke="#C9A45C" stroke-width="2" opacity=".5"/>
+<rect x="55" y="55" width="1090" height="490" rx="28" fill="none" stroke="#C9A45C" stroke-opacity=".3"/>
+<g transform="translate(825 100)" opacity=".88"><circle cx="150" cy="150" r="112" fill="#0A1113" stroke="#2A8D97" stroke-width="5"/><path d="M85 175 Q150 80 215 175 Q150 250 85 175Z" fill="none" stroke="#C9A45C" stroke-width="5"/><circle cx="120" cy="165" r="9" fill="#C9A45C"/><circle cx="180" cy="165" r="9" fill="#C9A45C"/><path d="M40 310 H260" stroke="#C9A45C" stroke-width="3"/></g>
+<text x="75" y="190" fill="#F5EBDD" font-family="Georgia,serif" font-size="66" letter-spacing="5">MINI-MOBILE-7</text>
+<text x="79" y="250" fill="#C9A45C" font-family="Arial,sans-serif" font-size="21" letter-spacing="5">PRIVATE LTE/5G LABORATORY</text>
+<text x="79" y="310" fill="#C3D0D2" font-family="Arial,sans-serif" font-size="18" letter-spacing="2">Open5GS · IMS · UERANSIM · eBPF</text>
+<text x="79" y="510" fill="#8FA1A4" font-family="Arial,sans-serif" font-size="15" letter-spacing="4">MOJEALTEREGO · IDEAS · PEOPLE · TECHNOLOGY · ART</text></svg>
