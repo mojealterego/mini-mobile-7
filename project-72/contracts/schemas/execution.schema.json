@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mini-mobile-7.local/project-72/schemas/execution.schema.json",
+  "title": "Project-72 Execution Request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "idempotency_key", "capability_id", "operation", "target", "expected_version"],
+  "properties": {
+    "request_id": {"type": "string", "minLength": 8},
+    "idempotency_key": {"type": "string", "minLength": 8},
+    "capability_id": {"type": "string", "minLength": 8},
+    "operation": {"type": "string", "enum": ["PROVISION", "ACTIVATE", "SUSPEND", "DEACTIVATE", "ROUTE_CALL"]},
+    "target": {"type": "string", "pattern": "^700[1-7]$"},
+    "expected_version": {"type": "integer", "minimum": 1},
+    "parameters": {"type": "object"}
+  }
+}
