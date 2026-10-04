@@ -8,6 +8,15 @@
 
 ---
 
+<!-- MOJEALTEREGO:PROJECT-STATUS:START -->
+> [!IMPORTANT]
+> **MojeAlterego project status:** `PROTOTYPE`  
+> **Domain:** Research / Telecom  
+> **Verification:** Lab architecture and configuration scaffolding are documented; physical RF deployment is explicitly not verified.  
+> **Status policy:** [MojeAlterego project status model](https://github.com/mojealterego/mojealterego/blob/main/docs/PROJECT-STATUS.md)
+<!-- MOJEALTEREGO:PROJECT-STATUS:END -->
+
+
 # MINI-MOBILE-7
 
 Private LTE/5G laboratory and private cellular network blueprint for up to 7 controlled devices.
